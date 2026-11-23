@@ -31,6 +31,9 @@ func (c *Config) Validate() error {
 	if col.OptionalEvery < 1 {
 		return fmt.Errorf("collection.optionalEvery %d must be >= 1", col.OptionalEvery)
 	}
+	if c.Sources.Ibswinfo.Enabled && c.Sources.Ibswinfo.Path == "" {
+		return errors.New("sources.ibswinfo.path must not be empty when sources.ibswinfo.enabled is true")
+	}
 	if len(c.Fabrics) == 0 && !c.Sources.LocalHCA {
 		return errors.New("no fabrics configured and sources.localHCA is false")
 	}

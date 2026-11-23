@@ -77,6 +77,7 @@ func TestValidate_CollectionAndFabricFields(t *testing.T) {
 		"optionalEvery":    func(c *Config) { c.Collection.OptionalEvery = 0 },
 		"ca":               func(c *Config) { c.Fabrics[0].CA = "" },
 		"port":             func(c *Config) { c.Fabrics[0].Port = 0 },
+		"ibswinfo":         func(c *Config) { c.Sources.Ibswinfo = Ibswinfo{Enabled: true} },
 	}
 	for want, mutate := range cases {
 		c := &Config{Server: Server{Port: 9449, URI: "/metrics"}, Collection: validCollection(),

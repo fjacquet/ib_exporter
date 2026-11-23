@@ -20,11 +20,12 @@ expanded in `server.uri`, `fabrics[].name|ca|nodeNameMap`, `sources.ibswinfo.pat
 | `fabrics[].nodeNameMap` | `""` | Node name map file; must list **port** GUIDs for HCAs |
 | `sources.localHCA` | `false` | Read the local HCA from `/sys/class/infiniband` |
 | `sources.ibswinfo.enabled` | `false` | Switch health via `ibswinfo` (optional, unverified) |
-| `sources.ibswinfo.path` | `""` | Path to `ibswinfo` (the sample config uses `/usr/bin/ibswinfo`) |
+| `sources.ibswinfo.path` | `""` | Path to `ibswinfo` (the sample config uses `/usr/bin/ibswinfo`); required when enabled. It is not an `infiniband-diags` tool, so it gets no `-C`/`-P` |
 | `replay.dir` | `""` | Non-empty: read fixtures from `<dir>/<fabric name>/` instead of running tools |
 
 Validation: at least one fabric or `sources.localHCA`; intervals > 0; `maxConcurrent` and
-`optionalEvery` >= 1; fabric names non-empty and unique.
+`optionalEvery` >= 1; fabric names non-empty and unique; `sources.ibswinfo.path` non-empty when
+`sources.ibswinfo.enabled`.
 
 **Reserved URIs** (`config.ReservedURIs`): `/`, `/health`, `/livez`, `/readyz`.
 
