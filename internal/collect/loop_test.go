@@ -572,3 +572,32 @@ func TestLoop_EmptyTopologyFreshReadIsUp(t *testing.T) {
 	require.NoError(t, l.Once(context.Background()))
 	require.True(t, st.Load().Fabrics["a"].Up)
 }
+
+// A port that went down loses its link in ibnetdiscover -p, but keeps reporting state Down
+// while its node is in the topology; it is forgotten when the node disappears.
+func TestLoop_DownedPortKeepsReportingState(t *testing.T) {
+	r := newFake()
+	register(t, r, "a", 1, 2)
+	clk := &clock{time.Unix(1000, 0)}
+	l, st := newLoop(newCfg("a"), r, clk)
+	require.NoError(t, l.Once(context.Background()))
+	sw1 := map[string]string{"guid": swGUID, "port": "1"}
+	require.InDelta(t, 4, one(t, st.Load().Fabrics["a"].Samples, "ib_port_state", sw1).Value, 0)
+
+	// The switch-HCA link drops: the switch lists port 1 unconnected, the HCA is gone.
+	r.set(key("a", "ibnetdiscover", "-p"), fmt.Sprintf("SW     1  1 %s 4x EDR\nSW     1  2 %s 4x EDR\n", swGUID, swGUID))
+	r.set(key("a", "smpquery", "portinfo", "1", "1"), readTD(t, "portinfo/down.txt"))
+	clk.t = clk.t.Add(10 * time.Minute)
+	require.NoError(t, l.Once(context.Background()))
+	fs := st.Load().Fabrics["a"]
+	require.Empty(t, fs.Links)
+	require.InDelta(t, 1, one(t, fs.Samples, "ib_port_state", sw1).Value, 0, "Down, not absent")
+	require.Empty(t, find(fs.Samples, "ib_port_state", map[string]string{"guid": hcaGUID}), "node left the topology")
+
+	// The switch leaves the topology too: its remembered port is forgotten.
+	r.set(key("a", "ibnetdiscover", "-p"), "")
+	clk.t = clk.t.Add(10 * time.Minute)
+	n := r.count(key("a", "smpquery", "portinfo", "1", "1"))
+	_ = l.Once(context.Background())
+	require.Equal(t, n, r.count(key("a", "smpquery", "portinfo", "1", "1")))
+}

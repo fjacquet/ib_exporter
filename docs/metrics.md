@@ -54,6 +54,12 @@ fixtures hand-written, output on real hardware **UNVERIFIED**). Gauges with the 
 Width, speed and rate are only emitted when the port is Active (a down port reports meaningless
 values). N/A or unparsable fields give no sample. Unknown speeds give no rate.
 
+Ports queried: those linked in the current topology, plus every port that was ever linked while its
+node stayed in the topology. A downed port has no link in `ibnetdiscover -p`, so without this its
+series would vanish; instead it keeps reporting `ib_port_state` 1 (Down). A remembered port is
+forgotten when its node leaves the topology or the loop restarts (reload). Ports never linked since
+start are not queried.
+
 ## SM (`sminfo`, `saquery SMIR`)
 
 `ib_sm_info{fabric,sm_guid,sm_lid} 1`, plus `ib_sm_state` (0 NotActive, 1 Discovering, 2 Standby,

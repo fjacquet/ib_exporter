@@ -34,7 +34,7 @@ type fabricState struct {
 	haveTopo bool
 	nodes    []ib.Node
 	links    []ib.Link
-	ports    map[string][]int // GUID -> connected ports, from links
+	ports    map[string][]int // GUID -> ports linked now or ever while the node stayed in the topology
 	topoAt   time.Time
 	piAt     time.Time
 	// Caches keyed by GUID (never LID), reused between runs of slower readers.
@@ -90,10 +90,20 @@ func (l *Loop) refreshTopology(ctx context.Context, fs *fabricState, now time.Ti
 		return false
 	}
 	fs.nodes, fs.links, fs.haveTopo, fs.topoAt = nodes, links, true, now
-	fs.ports = map[string][]int{}
-	for _, lk := range links {
-		fs.ports[lk.GUID] = append(fs.ports[lk.GUID], lk.Port)
+	// A downed port loses its link line; remember it so portinfo keeps reporting it Down.
+	// Ports are forgotten only when their node leaves the topology.
+	ports := map[string][]int{}
+	for _, n := range nodes {
+		if ps, ok := fs.ports[n.GUID]; ok {
+			ports[n.GUID] = slices.Clone(ps)
+		}
 	}
+	for _, lk := range links {
+		if !slices.Contains(ports[lk.GUID], lk.Port) {
+			ports[lk.GUID] = append(ports[lk.GUID], lk.Port)
+		}
+	}
+	fs.ports = ports
 	return true
 }
 
@@ -228,7 +238,7 @@ func portSamples(fs *fabricState, n ib.Node, pcs []diags.PortCounters) []ib.Samp
 	return ss
 }
 
-// portInfoSamples queries each connected port in parallel; each port job times itself
+// portInfoSamples queries each linked or remembered port in parallel; each port job times itself
 // into its own readerStat, merged here. One error per failing node.
 func (l *Loop) portInfoSamples(ctx context.Context, fs *fabricState, st stats, n ib.Node) []ib.Sample {
 	type portResult struct {
