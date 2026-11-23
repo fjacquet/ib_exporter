@@ -1,0 +1,28 @@
+# PortRcvErrorDetails counters: Lid 101 port 1
+PortLocalPhysicalErrors:.........0
+PortMalformedPktErrors:..........0
+PortBufferOverrunErrors:.........0
+PortDLIDMappingErrors:...........0
+PortVLMappingErrors:.............0
+PortLoopingErrors:...............0
+# PortRcvErrorDetails counters: Lid 101 port 2
+PortLocalPhysicalErrors:.........0
+PortMalformedPktErrors:..........0
+PortBufferOverrunErrors:.........0
+PortDLIDMappingErrors:...........0
+PortVLMappingErrors:.............0
+PortLoopingErrors:...............0
+# PortRcvErrorDetails counters: Lid 101 port 3
+PortLocalPhysicalErrors:.........5
+PortMalformedPktErrors:..........0
+PortBufferOverrunErrors:.........0
+PortDLIDMappingErrors:...........0
+PortVLMappingErrors:.............0
+PortLoopingErrors:...............0
+# PortRcvErrorDetails counters: Lid 101 port 5
+PortLocalPhysicalErrors:.........0
+PortMalformedPktErrors:..........0
+PortBufferOverrunErrors:.........0
+PortDLIDMappingErrors:...........0
+PortVLMappingErrors:.............0
+PortLoopingErrors:...............0

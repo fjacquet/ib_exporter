@@ -1,0 +1,11 @@
+# Port extended counters: Lid 14 port 1 (CapMask: 0x5A00 CapMask2: 0x0000000)
+PortSelect:......................1
+CounterSelect:...................0x0000
+PortXmitData:....................9014100000
+PortRcvData:.....................8014100000
+PortXmitPkts:....................300000141
+PortRcvPkts:.....................250000141
+PortUnicastXmitPkts:.............299000141
+PortUnicastRcvPkts:..............249000141
+PortMulticastXmitPkts:...........1000000
+PortMulticastRcvPkts:............1000000

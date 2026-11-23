@@ -1,0 +1,2 @@
+# PortXmitConCtrl counters: Lid 12 port 1
+PortXmitTimeCong:................300

@@ -1,0 +1,49 @@
+groups:
+  - name: ib-fabric
+    rules:
+      - alert: IBFabricDown
+        expr: ib_up == 0
+        for: 5m
+        labels: {severity: critical}
+        annotations:
+          summary: "InfiniBand fabric {{ $labels.fabric }} topology not readable"
+          description: "ib_up has been 0 for 5m: the exporter cannot run ibnetdiscover (SM down, HCA/port wrong, /dev/infiniband not mounted?)."
+      - alert: IBLinkDowned
+        expr: increase(ib_port_link_downed_total[10m]) > 0
+        labels: {severity: warning}
+        annotations:
+          summary: "Link downed on {{ $labels.node_name }} port {{ $labels.port }} ({{ $labels.fabric }})"
+          description: "LinkDownedCounter rose by {{ $value }} in 10m: the link dropped and retrained."
+      - alert: IBUncorrectableFEC
+        expr: increase(ib_port_fec_uncorrectable_blocks_total[10m]) > 0
+        labels: {severity: critical}
+        annotations:
+          summary: "Uncorrectable FEC blocks on {{ $labels.node_name }} port {{ $labels.port }} ({{ $labels.fabric }})"
+          description: "{{ $value }} uncorrectable FEC blocks in 10m: packets are being lost; check the cable or transceiver."
+      - alert: IBSubnetManagerChanged
+        expr: changes(ib_sm_info[15m]) > 0
+        labels: {severity: warning}
+        annotations:
+          summary: "Subnet manager changed on fabric {{ $labels.fabric }}"
+          description: "The ib_sm_info series (sm_guid/sm_lid) appeared or disappeared in the last 15m: SM failover or restart."
+      - alert: IBSymbolErrorRateHigh
+        expr: rate(ib_port_symbol_error_total[10m]) > 1
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "High symbol error rate on {{ $labels.node_name }} port {{ $labels.port }} ({{ $labels.fabric }})"
+          description: "{{ $value | humanize }} symbol errors/s for 10m."
+      - alert: IBPortXmitDiscards
+        expr: increase(ib_port_xmit_discards_total[10m]) > 0
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "Transmit discards on {{ $labels.node_name }} port {{ $labels.port }} ({{ $labels.fabric }})"
+          description: "{{ $value }} packets discarded at transmit in 10m (see ib_port_xmit_*_discards_total for the cause)."
+      - alert: IBCollectErrors
+        expr: increase(ib_collect_errors_total[15m]) > 0
+        for: 15m
+        labels: {severity: warning}
+        annotations:
+          summary: "Exporter reader {{ $labels.reader }} failing on {{ $labels.fabric }}"
+          description: "Reader failures keep occurring (infiniband-diags errors, permissions, or a node that does not answer)."

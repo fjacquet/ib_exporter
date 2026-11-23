@@ -1,0 +1,17 @@
+# PortExtendedSpeedsCounters counters: Lid 12 port 1
+PortSelect:......................1
+CounterSelect:...................0x0000000000000000
+SyncHeaderErrorCounter:..........0
+UnknownBlockCounter:.............0
+ErrorDetectionCounterLane0:......0
+ErrorDetectionCounterLane1:......0
+ErrorDetectionCounterLane2:......0
+ErrorDetectionCounterLane3:......0
+FECCorrectableBlockCtrLane0:.....0
+FECCorrectableBlockCtrLane1:.....10
+FECCorrectableBlockCtrLane2:.....20
+FECCorrectableBlockCtrLane3:.....30
+FECUncorrectableBlockCtrLane0:...0
+FECUncorrectableBlockCtrLane1:...0
+FECUncorrectableBlockCtrLane2:...0
+FECUncorrectableBlockCtrLane3:...0

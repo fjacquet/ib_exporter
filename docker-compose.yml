@@ -1,0 +1,59 @@
+# End-to-end demo stack, exporter BUILT FROM SOURCE, no InfiniBand hardware needed.
+#   docker compose up -d --build
+# Grafana: http://localhost:3000 (admin / $GRAFANA_ADMIN_PASSWORD, default admin).
+# Prometheus: http://localhost:9090. Exporter: http://localhost:9449/metrics.
+services:
+  ib_exporter:
+    build: .
+    image: ib_exporter
+    pull_policy: build
+    container_name: ib_exporter
+    command: ["--config", "/etc/ib_exporter/config.yaml"]
+    ports:
+      - "9449:9449"
+    volumes:
+      - ./deploy/demo/config.yaml:/etc/ib_exporter/config.yaml:ro
+      # Recorded infiniband-diags output: the demo needs no InfiniBand hardware.
+      - ./deploy/demo/replay:/replay:ro
+    # REAL hardware (instead of the replay demo): use your own config.yaml without
+    # `replay.dir`, drop the /replay mount above, and uncomment:
+    #   devices:
+    #     - /dev/infiniband
+    #   group_add:
+    #     - "${UMAD_GID}"   # numeric gid of /dev/infiniband/umad*: ls -ln /dev/infiniband/umad*
+    # See docs/deployment/docker.md.
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9449/livez"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: ib_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/prometheus:/etc/prometheus/deploy/prometheus:ro
+    depends_on:
+      - ib_exporter
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: ib_grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    restart: unless-stopped

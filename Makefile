@@ -13,7 +13,7 @@ GORELEASER_VERSION ?= v2.18.0
 .PHONY: all clean install tools lint format test build vuln sbom security docs \
         coverage-upload release ci \
         fmt-check fmt vet test-race test-coverage sure \
-        cli release-snapshot docker run-cli clean-dist
+        cli release-snapshot docker run-cli clean-dist check-deploy
 
 all: clean lint test build
 
@@ -102,3 +102,10 @@ run-cli: cli
 
 clean-dist:
 	rm -rf $(DIST)
+
+# Validate alert rules, Prometheus config, dashboards JSON and that they only use cataloged metric names.
+check-deploy:
+	promtool check rules deploy/prometheus/ib.rules.yml
+	promtool check config prometheus.yml
+	for f in grafana/dashboards/*.json; do python3 -c 'import json,sys; json.load(open(sys.argv[1]))' $$f || exit 1; done
+	python3 deploy/check-metric-names.py

@@ -1,0 +1,33 @@
+# Port extended counters: Lid 102 port 1 (CapMask: 0x5A00 CapMask2: 0x0000000)
+PortSelect:......................1
+CounterSelect:...................0x0000
+PortXmitData:....................9102100000
+PortRcvData:.....................8102100000
+PortXmitPkts:....................300001021
+PortRcvPkts:.....................250001021
+PortUnicastXmitPkts:.............299001021
+PortUnicastRcvPkts:..............249001021
+PortMulticastXmitPkts:...........1000000
+PortMulticastRcvPkts:............1000000
+# Port extended counters: Lid 102 port 2 (CapMask: 0x5A00 CapMask2: 0x0000000)
+PortSelect:......................2
+CounterSelect:...................0x0000
+PortXmitData:....................9102200000
+PortRcvData:.....................8102200000
+PortXmitPkts:....................300001022
+PortRcvPkts:.....................250001022
+PortUnicastXmitPkts:.............299001022
+PortUnicastRcvPkts:..............249001022
+PortMulticastXmitPkts:...........1000000
+PortMulticastRcvPkts:............1000000
+# Port extended counters: Lid 102 port 5 (CapMask: 0x5A00 CapMask2: 0x0000000)
+PortSelect:......................5
+CounterSelect:...................0x0000
+PortXmitData:....................9102500000
+PortRcvData:.....................8102500000
+PortXmitPkts:....................300001025
+PortRcvPkts:.....................250001025
+PortUnicastXmitPkts:.............299001025
+PortUnicastRcvPkts:..............249001025
+PortMulticastXmitPkts:...........1000000
+PortMulticastRcvPkts:............1000000
