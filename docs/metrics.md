@@ -89,3 +89,51 @@ layout. Labels `fabric,device,port,guid`; `fabric=""` when the port is not bound
 | `node_guid`, `board_id`, `fw_ver` | `ib_hca_info{board_id,firmware,node_guid}` | value 1 |
 
 Only port-level `hw_counters/` is read (not the device-level directory some drivers also expose).
+
+## Port counter names (perfquery basic, `-x`, `-E`, `-D`)
+
+Cumulative counters (`_total`, use `rate()`), labels `fabric,node_type,guid,node_name,port`.
+Field mapping is in `internal/ib/diags/perfquery.go`; output on real hardware **UNVERIFIED**.
+
+| Reader | Metrics |
+|---|---|
+| basic / `-x` data, packets | `ib_port_xmit_data_bytes_total`, `ib_port_rcv_data_bytes_total`, `ib_port_xmit_packets_total`, `ib_port_rcv_packets_total`, `ib_port_unicast_xmit_packets_total`, `ib_port_unicast_rcv_packets_total`, `ib_port_multicast_xmit_packets_total`, `ib_port_multicast_rcv_packets_total` |
+| basic errors | `ib_port_symbol_error_total`, `ib_port_link_error_recovery_total`, `ib_port_link_downed_total`, `ib_port_rcv_errors_total`, `ib_port_rcv_remote_physical_errors_total`, `ib_port_rcv_switch_relay_errors_total`, `ib_port_xmit_discards_total`, `ib_port_xmit_constraint_errors_total`, `ib_port_rcv_constraint_errors_total`, `ib_port_local_link_integrity_errors_total`, `ib_port_excessive_buffer_overrun_errors_total`, `ib_port_vl15_dropped_total`, `ib_port_qp1_dropped_total`, `ib_port_xmit_wait_total` |
+| `-E` | `ib_port_local_physical_errors_total`, `ib_port_malformed_packet_errors_total`, `ib_port_buffer_overrun_errors_total`, `ib_port_dlid_mapping_errors_total`, `ib_port_vl_mapping_errors_total`, `ib_port_looping_errors_total` |
+| `-D` | `ib_port_xmit_inactive_discards_total`, `ib_port_xmit_neighbor_mtu_discards_total`, `ib_port_xmit_sw_lifetime_limit_discards_total`, `ib_port_xmit_sw_hoq_lifetime_limit_discards_total` |
+| `--rcvcc`, `--xmitcc` | `ib_port_rcv_fecn_total`, `ib_port_rcv_becn_total`, `ib_port_xmit_time_cong_total` |
+
+## Local HCA counter names in the sysfs fixture
+
+`ib_hca_<name>_total` follows whatever files `counters/` and `counters_ext/` hold, so this list is
+what the mlx5 fixture yields, not a closed set: `ib_hca_xmit_data_bytes_total`,
+`ib_hca_rcv_data_bytes_total`, `ib_hca_xmit_packets_total`, `ib_hca_rcv_packets_total`,
+`ib_hca_unicast_xmit_packets_total`, `ib_hca_symbol_error_total`, `ib_hca_rcv_errors_total`,
+`ib_hca_vl15_dropped_total`.
+
+## Topology (`ibnetdiscover -p`)
+
+Gauges, value 1, refreshed every `collection.topologyInterval`.
+
+| Metric | Labels |
+|---|---|
+| `ib_node_info` | `fabric,guid,node_name,node_type,lid,firmware` (`firmware` is `""`: not in `ibnetdiscover -p` output) |
+| `ib_link_info` | `fabric,guid,port,remote_guid,remote_port,remote_name` (one series per direction) |
+
+## Exporter
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `ib_up` | gauge | `fabric` | 1 when the topology was read this cycle, else 0. A down fabric is data, not a scrape failure. |
+| `ib_collect_errors_total` | counter | `fabric,reader` | Reader failures since start: one per failing node (or command group), not per command. |
+| `ib_collect_duration_seconds` | gauge | `fabric,reader` | Sum of the reader's exec durations in its last cycle that ran, **including waits for a free exec slot** (`collection.maxConcurrent`). Readers run in parallel, so it is work time, not wall-clock time, and can exceed the interval. Absent until the reader first ran. |
+| `ib_collect_last_success_timestamp_seconds` | gauge | `fabric,reader` | Unix time of the reader's last successful cycle. Absent until it first succeeded. |
+| `ib_exporter_build_info` | gauge | `version,goversion` | Constant 1. The only series without `fabric`: it describes the process. |
+
+`reader` is `topology`, `perfquery`, `perfquery_optional`, `portinfo`, `sm`, `ibswinfo` (when
+enabled), or `sysfs` (local HCA, `fabric=""`).
+
+Export rules (`internal/ib/metrics.go`): both Prometheus and OTLP skip a sample with an invalid
+name, label or UTF-8 value, a label-key set or counter/gauge kind other than the first sample of
+that name in the snapshot, or a duplicate series. OTLP registers instruments for new names
+asynchronously, so a name observed for the first time is exported from the next OTLP collection on.
