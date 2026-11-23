@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"time"
 
+	"golang.org/x/sync/errgroup"
+
 	"github.com/fjacquet/ib_exporter/internal/config"
 	"github.com/fjacquet/ib_exporter/internal/ib"
 	"github.com/fjacquet/ib_exporter/internal/ib/diags"
@@ -40,15 +42,11 @@ type fabricState struct {
 	portInfo map[string][]ib.Sample
 	health   map[string][]ib.Sample
 	sm       []ib.Sample
-	stats    map[string]*readerStat
+	stats    stats
 }
 
 func newFabricState(f config.Fabric) *fabricState {
-	fs := &fabricState{f: f, stats: map[string]*readerStat{}}
-	for _, r := range []string{rdTopology, rdPerf, rdOptional, rdPortInfo, rdSM, rdIbswinfo} {
-		fs.stats[r] = &readerStat{}
-	}
-	return fs
+	return &fabricState{f: f, stats: newStats()}
 }
 
 func (l *Loop) collectFabric(ctx context.Context, fs *fabricState, now time.Time, optional bool) *ib.FabricSnapshot {
@@ -75,7 +73,7 @@ func (l *Loop) refreshTopology(ctx context.Context, fs *fabricState, now time.Ti
 	if fs.haveTopo && now.Sub(fs.topoAt) < l.cfg.Collection.TopologyInterval {
 		return true
 	}
-	out, err := l.run(ctx, fs, rdTopology, "ibnetdiscover", "-p")
+	out, err := l.run(ctx, fs.f, fs.stats[rdTopology], "ibnetdiscover", "-p")
 	if err != nil {
 		fs.stats[rdTopology].record(err)
 		return false
@@ -97,61 +95,118 @@ func (l *Loop) refreshTopology(ctx context.Context, fs *fabricState, now time.Ti
 	return true
 }
 
-// fabricSamples builds a fresh slice every cycle: cached slices are only copied from.
+// stats is per-reader accounting. Node workers each fill their own; the fabric
+// goroutine merges them, so fs.stats and the caches are never shared across goroutines.
+type stats map[string]*readerStat
+
+func newStats() stats {
+	st := stats{}
+	for _, r := range []string{rdTopology, rdPerf, rdOptional, rdPortInfo, rdSM, rdIbswinfo} {
+		st[r] = &readerStat{}
+	}
+	return st
+}
+
+// nodeResult is what one node worker returns; merged on the fabric goroutine.
+type nodeResult struct {
+	counters, optional, portInfo, health []ib.Sample
+	st                                   stats
+}
+
+// parallel runs f(0..n-1) with at most limit goroutines and returns results in index order.
+func parallel[T any](n, limit int, f func(i int) T) []T {
+	out := make([]T, n)
+	var g errgroup.Group
+	g.SetLimit(limit)
+	for i := range n {
+		g.Go(func() error {
+			out[i] = f(i)
+			return nil
+		})
+	}
+	_ = g.Wait() // workers always return nil
+	return out
+}
+
+// fabricSamples builds a fresh slice every cycle, in topology order: cached slices are only copied from.
 func (l *Loop) fabricSamples(ctx context.Context, fs *fabricState, now time.Time, optional bool) []ib.Sample {
 	ss := topologySamples(fs.f.Name, fs.nodes, fs.links)
 	runPI := fs.piAt.IsZero() || now.Sub(fs.piAt) >= l.cfg.Collection.PortInfoInterval
+	if runPI {
+		fs.piAt, fs.sm = now, l.smSamples(ctx, fs)
+	}
+	var nodes []ib.Node
+	for _, n := range fs.nodes {
+		if n.LID != 0 {
+			nodes = append(nodes, n)
+		}
+	}
+	res := parallel(len(nodes), l.cfg.Collection.MaxConcurrent, func(i int) nodeResult {
+		return l.collectNode(ctx, fs, nodes[i], optional, runPI)
+	})
 	if optional {
 		fs.optional = map[string][]ib.Sample{}
 	}
 	if runPI {
-		fs.piAt, fs.portInfo, fs.health = now, map[string][]ib.Sample{}, map[string][]ib.Sample{}
-		fs.sm = l.smSamples(ctx, fs)
+		fs.portInfo, fs.health = map[string][]ib.Sample{}, map[string][]ib.Sample{}
 	}
-	for _, n := range fs.nodes {
-		if n.LID == 0 {
-			continue
+	for i, n := range nodes {
+		r := res[i]
+		for name, st := range r.st {
+			fs.stats[name].add(st)
 		}
-		ss = append(ss, l.counters(ctx, fs, n)...)
 		if optional {
-			fs.optional[n.GUID] = l.optionalCounters(ctx, fs, n)
+			fs.optional[n.GUID] = r.optional
 		}
 		if runPI {
-			fs.portInfo[n.GUID] = l.portInfoSamples(ctx, fs, n)
-			if l.cfg.Sources.Ibswinfo.Enabled && n.Type == ib.NodeSwitch {
-				fs.health[n.GUID] = l.switchHealth(ctx, fs, n)
-			}
+			fs.portInfo[n.GUID], fs.health[n.GUID] = r.portInfo, r.health
 		}
-		ss = append(append(append(ss, fs.optional[n.GUID]...), fs.portInfo[n.GUID]...), fs.health[n.GUID]...)
+		ss = append(append(append(append(ss, r.counters...), fs.optional[n.GUID]...), fs.portInfo[n.GUID]...), fs.health[n.GUID]...)
 	}
 	return append(ss, fs.sm...)
 }
 
+// collectNode runs on a worker goroutine: it reads fs.f and fs.ports only and owns res.st.
+func (l *Loop) collectNode(ctx context.Context, fs *fabricState, n ib.Node, optional, runPI bool) nodeResult {
+	res := nodeResult{st: newStats()}
+	res.counters = l.counters(ctx, fs, res.st, n)
+	if optional {
+		res.optional = l.optionalCounters(ctx, fs, res.st, n)
+	}
+	if runPI {
+		res.portInfo = l.portInfoSamples(ctx, fs, res.st, n)
+		if l.cfg.Sources.Ibswinfo.Enabled && n.Type == ib.NodeSwitch {
+			res.health = l.switchHealth(ctx, fs, res.st, n)
+		}
+	}
+	return res
+}
+
 // counters reads basic (errors) and -x (64-bit data/packets) for every port of n.
 // Whatever succeeded is exported; one error per failing node, not per command.
-func (l *Loop) counters(ctx context.Context, fs *fabricState, n ib.Node) []ib.Sample {
+func (l *Loop) counters(ctx context.Context, fs *fabricState, st stats, n ib.Node) []ib.Sample {
 	lid := strconv.Itoa(int(n.LID))
-	basic, errB := l.perfquery(ctx, fs, rdPerf, "-a", "-l", lid)
-	ext, errX := l.perfquery(ctx, fs, rdPerf, "-x", "-a", "-l", lid)
-	fs.stats[rdPerf].record(errors.Join(errB, errX))
+	basic, errB := l.perfquery(ctx, fs, st[rdPerf], "-a", "-l", lid)
+	ext, errX := l.perfquery(ctx, fs, st[rdPerf], "-x", "-a", "-l", lid)
+	st[rdPerf].record(errors.Join(errB, errX))
 	return portSamples(fs, n, diags.MergeCounters(basic, ext))
 }
 
-func (l *Loop) optionalCounters(ctx context.Context, fs *fabricState, n ib.Node) []ib.Sample {
+func (l *Loop) optionalCounters(ctx context.Context, fs *fabricState, st stats, n ib.Node) []ib.Sample {
 	lid := strconv.Itoa(int(n.LID))
 	var ss []ib.Sample
 	var errs []error
 	for _, opt := range optionalOpts {
-		pcs, err := l.perfquery(ctx, fs, rdOptional, opt, "-a", "-l", lid)
+		pcs, err := l.perfquery(ctx, fs, st[rdOptional], opt, "-a", "-l", lid)
 		errs = append(errs, err)
 		ss = append(ss, portSamples(fs, n, pcs)...)
 	}
-	fs.stats[rdOptional].record(errors.Join(errs...))
+	st[rdOptional].record(errors.Join(errs...))
 	return ss
 }
 
-func (l *Loop) perfquery(ctx context.Context, fs *fabricState, reader string, args ...string) ([]diags.PortCounters, error) {
-	out, err := l.run(ctx, fs, reader, "perfquery", args...)
+func (l *Loop) perfquery(ctx context.Context, fs *fabricState, st *readerStat, args ...string) ([]diags.PortCounters, error) {
+	out, err := l.run(ctx, fs.f, st, "perfquery", args...)
 	if err != nil {
 		return nil, err
 	}
@@ -171,28 +226,40 @@ func portSamples(fs *fabricState, n ib.Node, pcs []diags.PortCounters) []ib.Samp
 	return ss
 }
 
-func (l *Loop) portInfoSamples(ctx context.Context, fs *fabricState, n ib.Node) []ib.Sample {
-	lid := strconv.Itoa(int(n.LID))
-	var ss []ib.Sample
-	var errs []error
-	for _, p := range fs.ports[n.GUID] {
-		out, err := l.run(ctx, fs, rdPortInfo, "smpquery", "portinfo", lid, strconv.Itoa(p))
+// portInfoSamples queries each connected port in parallel; each port job times itself
+// into its own readerStat, merged here. One error per failing node.
+func (l *Loop) portInfoSamples(ctx context.Context, fs *fabricState, st stats, n ib.Node) []ib.Sample {
+	type portResult struct {
+		ss  []ib.Sample
+		err error
+		st  readerStat
+	}
+	lid, ports := strconv.Itoa(int(n.LID)), fs.ports[n.GUID]
+	res := parallel(len(ports), l.cfg.Collection.MaxConcurrent, func(i int) portResult {
+		var r portResult
+		out, err := l.run(ctx, fs.f, &r.st, "smpquery", "portinfo", lid, strconv.Itoa(ports[i]))
 		var pi diags.PortInfo
 		if err == nil {
 			pi, err = diags.ParsePortInfo(out)
 		}
-		if err != nil {
-			errs = append(errs, err)
-			continue
+		if r.err = err; err == nil {
+			r.ss = diags.PortInfoSamples(fs.f.Name, n, ports[i], pi)
 		}
-		ss = append(ss, diags.PortInfoSamples(fs.f.Name, n, p, pi)...)
+		return r
+	})
+	var ss []ib.Sample
+	var errs []error
+	for i := range res {
+		st[rdPortInfo].add(&res[i].st)
+		errs = append(errs, res[i].err)
+		ss = append(ss, res[i].ss...)
 	}
-	fs.stats[rdPortInfo].record(errors.Join(errs...))
+	st[rdPortInfo].record(errors.Join(errs...))
 	return ss
 }
 
 func (l *Loop) smSamples(ctx context.Context, fs *fabricState) []ib.Sample {
-	out, err := l.run(ctx, fs, rdSM, "sminfo")
+	out, err := l.run(ctx, fs.f, fs.stats[rdSM], "sminfo")
 	var sm diags.SMInfo
 	if err == nil {
 		sm, err = diags.ParseSMInfo(out)
@@ -204,24 +271,24 @@ func (l *Loop) smSamples(ctx context.Context, fs *fabricState) []ib.Sample {
 	return diags.SMSamples(fs.f.Name, sm)
 }
 
-func (l *Loop) switchHealth(ctx context.Context, fs *fabricState, n ib.Node) []ib.Sample {
-	out, err := l.run(ctx, fs, rdIbswinfo, l.cfg.Sources.Ibswinfo.Path, "-d", "lid-"+strconv.Itoa(int(n.LID)))
+func (l *Loop) switchHealth(ctx context.Context, fs *fabricState, st stats, n ib.Node) []ib.Sample {
+	out, err := l.run(ctx, fs.f, st[rdIbswinfo], l.cfg.Sources.Ibswinfo.Path, "-d", "lid-"+strconv.Itoa(int(n.LID)))
 	var h diags.SwitchHealth
 	if err == nil {
 		h, err = diags.ParseIbswinfo(out)
 	}
-	fs.stats[rdIbswinfo].record(err)
+	st[rdIbswinfo].record(err)
 	if err != nil {
 		return nil
 	}
 	return diags.SwitchHealthSamples(fs.f.Name, n, h)
 }
 
-// run executes one tool and adds its wall time to the reader's cycle duration.
-func (l *Loop) run(ctx context.Context, fs *fabricState, reader, tool string, args ...string) ([]byte, error) {
-	st := fs.stats[reader]
+// run executes one tool and adds its time (including the wait for a concurrency slot)
+// to st's cycle duration. st must be owned by the calling goroutine.
+func (l *Loop) run(ctx context.Context, f config.Fabric, st *readerStat, tool string, args ...string) ([]byte, error) {
 	start := time.Now()
-	out, err := l.r.Run(ctx, fs.f, tool, args...)
+	out, err := l.r.Run(ctx, f, tool, args...)
 	st.cycDur += time.Since(start)
 	st.cycRan = true
 	return out, err

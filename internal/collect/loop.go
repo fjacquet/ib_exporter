@@ -41,7 +41,8 @@ type Loop struct {
 
 // NewCollectionLoop builds a loop over cfg; cfg must have passed Validate.
 func NewCollectionLoop(cfg *config.Config, r diags.Runner, store *ib.SnapshotStore, opts ...Option) *Loop {
-	l := &Loop{cfg: cfg, r: r, store: store, now: time.Now, hcaRoot: sysfs.DefaultRoot}
+	l := &Loop{cfg: cfg, r: limitRunner{r: r, sem: make(chan struct{}, cfg.Collection.MaxConcurrent)},
+		store: store, now: time.Now, hcaRoot: sysfs.DefaultRoot}
 	for _, f := range cfg.Fabrics {
 		l.fabrics = append(l.fabrics, newFabricState(f))
 	}
@@ -75,8 +76,9 @@ func (l *Loop) Once(ctx context.Context) error {
 	l.cycle++
 
 	snaps := make([]*ib.FabricSnapshot, len(l.fabrics))
-	var g errgroup.Group // not WithContext: one fabric failing must not cancel the others
-	g.SetLimit(l.cfg.Collection.MaxConcurrent)
+	// All fabrics run at once; limitRunner bounds in-flight execs. Not WithContext:
+	// one fabric failing must not cancel the others.
+	var g errgroup.Group
 	for i, fs := range l.fabrics {
 		g.Go(func() error {
 			snaps[i] = l.collectFabric(ctx, fs, now, optional)
@@ -123,4 +125,21 @@ func (l *Loop) fabricFor(dev string, port int) string {
 		}
 	}
 	return ""
+}
+
+// limitRunner bounds in-flight execs across all fabrics and readers to cap(sem):
+// collection.maxConcurrent limits PMA/SMP load on the fabric, not goroutines.
+type limitRunner struct {
+	r   diags.Runner
+	sem chan struct{}
+}
+
+func (lr limitRunner) Run(ctx context.Context, f config.Fabric, tool string, args ...string) ([]byte, error) {
+	select {
+	case lr.sem <- struct{}{}:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+	defer func() { <-lr.sem }()
+	return lr.r.Run(ctx, f, tool, args...)
 }

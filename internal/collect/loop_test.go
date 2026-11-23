@@ -344,20 +344,74 @@ func TestLoop_UnparsableTopologyIsDown(t *testing.T) {
 	require.InDelta(t, 1, one(t, a.Samples, "ib_collect_errors_total", map[string]string{"reader": "topology"}).Value, 0)
 }
 
-func TestLoop_MaxConcurrentRespected(t *testing.T) {
-	r := newFake()
-	r.delay = 2 * time.Millisecond
-	names := []string{"f1", "f2", "f3", "f4", "f5"}
-	for _, n := range names {
-		register(t, r, n, 1, 2)
+// registerWide serves one switch (LID 1) with n HCAs (LIDs 101..) on ports 1..n.
+func registerWide(r *fakeRunner, fabric string, n int) {
+	var topo strings.Builder
+	for i := 1; i <= n; i++ {
+		g := fmt.Sprintf("0x0002c90300cc%04x", i)
+		fmt.Fprintf(&topo, "SW     1 %2d %s 4x EDR - CA %5d  1 %s ( 'sw1' - 'h%d' )\n", i, swGUID, 100+i, g, i)
+		fmt.Fprintf(&topo, "CA %5d  1 %s 4x EDR - SW     1 %2d %s ( 'h%d' - 'sw1' )\n", 100+i, g, i, swGUID, i)
 	}
-	cfg := newCfg(names...)
-	cfg.Collection.MaxConcurrent = 2
-	l, st := newLoop(cfg, r, &clock{time.Unix(1000, 0)})
-	require.NoError(t, l.Once(context.Background()))
-	require.Len(t, st.Load().Fabrics, 5)
-	require.LessOrEqual(t, r.max, 2)
-	require.Equal(t, 2, r.max, "fabrics run in parallel")
+	r.set(key(fabric, "ibnetdiscover", "-p"), topo.String())
+	lids := []int{1}
+	for i := 1; i <= n; i++ {
+		lids = append(lids, 100+i)
+	}
+	for _, lid := range lids {
+		r.set(key(fabric, "perfquery", "-a", "-l", fmt.Sprint(lid)), basic(lid, 1))
+		r.set(key(fabric, "perfquery", "-x", "-a", "-l", fmt.Sprint(lid)), ext(lid, 1))
+	}
+}
+
+func TestLoop_MaxConcurrentRespected(t *testing.T) {
+	t.Run("single fabric fills the limit", func(t *testing.T) {
+		r := newFake()
+		r.delay = 2 * time.Millisecond
+		registerWide(r, "a", 10)
+		cfg := newCfg("a")
+		cfg.Collection.MaxConcurrent = 3
+		l, st := newLoop(cfg, r, &clock{time.Unix(1000, 0)})
+		require.NoError(t, l.Once(context.Background()))
+		require.True(t, st.Load().Fabrics["a"].Up)
+		require.Len(t, find(st.Load().Fabrics["a"].Samples, "ib_port_xmit_data_bytes_total", nil), 11)
+		require.LessOrEqual(t, r.max, 3)
+		require.Equal(t, 3, r.max, "nodes of one fabric run in parallel up to maxConcurrent")
+	})
+	t.Run("limit is global across fabrics", func(t *testing.T) {
+		r := newFake()
+		r.delay = 2 * time.Millisecond
+		names := []string{"f1", "f2", "f3", "f4", "f5"}
+		for _, n := range names {
+			registerWide(r, n, 6)
+		}
+		cfg := newCfg(names...)
+		cfg.Collection.MaxConcurrent = 2
+		l, st := newLoop(cfg, r, &clock{time.Unix(1000, 0)})
+		require.NoError(t, l.Once(context.Background()))
+		require.Len(t, st.Load().Fabrics, 5)
+		require.LessOrEqual(t, r.max, 2)
+		require.Equal(t, 2, r.max)
+	})
+}
+
+func TestLoop_SampleOrderIsDeterministic(t *testing.T) {
+	r := newFake()
+	registerWide(r, "a", 8)
+	names := func() []string {
+		l, st := newLoop(newCfg("a"), r, &clock{time.Unix(1000, 0)})
+		require.NoError(t, l.Once(context.Background()))
+		var ns []string
+		for _, s := range st.Load().Fabrics["a"].Samples {
+			if !strings.HasPrefix(s.Name, "ib_collect_") {
+				ns = append(ns, fmt.Sprint(s.Name, s.Labels))
+			}
+		}
+		return ns
+	}
+	first := names()
+	for range 5 {
+		require.Equal(t, first, names())
+	}
 }
 
 func TestLoop_StaleLIDYieldsAbsentSamplesAndErrorCount(t *testing.T) {

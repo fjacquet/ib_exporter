@@ -30,6 +30,14 @@ func (s *readerStat) record(err error) {
 	s.cycOK = true
 }
 
+// add merges a worker's cycle accounting into s.
+func (s *readerStat) add(o *readerStat) {
+	s.errors += o.errors
+	s.cycDur += o.cycDur
+	s.cycRan = s.cycRan || o.cycRan
+	s.cycOK = s.cycOK || o.cycOK
+}
+
 // finish folds the cycle into the lasting state and resets the cycle fields.
 func (s *readerStat) finish(now time.Time) {
 	if s.cycRan {
