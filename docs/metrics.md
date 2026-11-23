@@ -70,3 +70,22 @@ Fixtures are hand-written, **UNVERIFIED** on hardware.
 `psu`+`state` (`ib_switch_psu_status_info`, value 1), none (`ib_switch_uptime_seconds`),
 `part_number,serial_number,firmware_version,psid` (`ib_switch_hardware_info`, value 1).
 Unrecognised input is an error; N/A readings are absent, never zero.
+
+## Local HCA (`/sys/class/infiniband`, `internal/ib/sysfs`) - UNVERIFIED on hardware
+
+Read from `<root>/<device>/ports/<n>/`; fixture `internal/ib/sysfs/testdata/sysfs/` is hand-written, modelled on the mlx5
+layout. Labels `fabric,device,port,guid`; `fabric=""` when the port is not bound in config. `guid` is the **port** GUID
+(low 64 bits of `gids/0`, `0x%016x`). Device names are never assumed. Unreadable or unparsable files give no sample.
+
+| Source | Metric | Notes |
+|---|---|---|
+| `counters/*`, `counters_ext/*` | `ib_hca_<name>_total` | `port_` prefix and `_64` suffix dropped, lowercased (`link_downed` -> `ib_hca_link_downed_total`); `counters_ext` overrides `counters` |
+| `port_{rcv,xmit}_data[_64]` | `ib_hca_{rcv,xmit}_data_bytes_total` | units of 4 octets (kernel `sysfs-class-infiniband`), exported x4 |
+| every file in `hw_counters/` | `ib_hca_hw_counter_total{name}` | enumerated, no hard-coded list |
+| `state` (`4: ACTIVE`), `phys_state` (`5: LinkUp`) | `ib_hca_state`, `ib_hca_phys_state` | leading number, same codes as `ib_port_*` |
+| `rate` (`100 Gb/sec (4X EDR)`) | `ib_hca_rate_bytes_per_second` | leading number x 1e9 / 8 |
+| `lid`, `sm_lid` | `ib_hca_lid`, `ib_hca_sm_lid` | gauges |
+| `link_layer` | `ib_hca_link_layer_info{link_layer}` | value 1 |
+| `node_guid`, `board_id`, `fw_ver` | `ib_hca_info{board_id,firmware,node_guid}` | value 1 |
+
+Only port-level `hw_counters/` is read (not the device-level directory some drivers also expose).
