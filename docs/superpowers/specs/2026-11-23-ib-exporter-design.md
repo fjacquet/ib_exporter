@@ -76,7 +76,7 @@ Exact `-T` field names (per-lane FEC, sync header, unlocked block): **still unkn
 
 ### Identity
 
-Series key = `fabric` + node GUID + port number. Each cycle resolves GUID→LID from the latest topology
+Series key = `fabric` + GUID + port number. **Amendment 2026-11-23 (Task 3 review ruling):** `ibnetdiscover -p` carries only port GUIDs. For switches all ports share the switch GUID, so GUID = node GUID. For HCAs `guid` is the **port GUID**, which is also what `perfquery -G` addresses; a dual-port HCA therefore shows as two `guid` values, grouped by `node_name`. Local sysfs series carry the same `guid` (port GUID, from `ports/<n>/gids/0`) plus `node_guid` in `ib_hca_info`, so fabric and local series join. A node-name-map must list port GUIDs for HCAs. Each cycle resolves GUID→LID from the latest topology
 snapshot. A stale LID that fails yields an absent sample for that node and increments
 `ib_collect_errors_total{fabric,reader}`.
 
