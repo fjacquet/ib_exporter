@@ -178,3 +178,38 @@ func TestParse_UnknownFormatErrors(t *testing.T) {
 		t.Fatalf("empty: %v %v", pcs, err)
 	}
 }
+
+func TestMerge_DataFieldsOnlyFromExtended(t *testing.T) {
+	b, _ := ParsePerfquery(readFixture(t, "basic.txt"))
+	// ext has port 1 with data N/A, and no port 2 at all.
+	x, _ := ParsePerfquery([]byte("# Port extended counters: Lid 5 port 1\nPortXmitData:....................N/A\nPortRcvData:.....................N/A\n"))
+	m := MergeCounters(b, x)
+	if len(m) != 2 {
+		t.Fatalf("len %d", len(m))
+	}
+	for _, pc := range m {
+		for _, f := range []string{"PortXmitData", "PortRcvData", "PortXmitPkts", "PortRcvPkts"} {
+			if _, ok := pc.Fields[f]; ok {
+				t.Fatalf("port %d: 32-bit %s leaked from basic", pc.Port, f)
+			}
+		}
+		if _, ok := pc.Fields["PortXmitDiscards"]; !ok {
+			t.Fatalf("port %d: basic error field lost", pc.Port)
+		}
+		if _, ok := pc.Fields["SymbolErrorCounter"]; !ok {
+			t.Fatalf("port %d: SymbolErrorCounter lost", pc.Port)
+		}
+	}
+	ss := ToSamples("f", ib.Node{GUID: "0x1"}, m[0])
+	if _, ok := sampleVal(ss, "ib_port_xmit_data_bytes_total"); ok {
+		t.Fatal("data sample must be absent")
+	}
+}
+
+func TestToSamples_LaneAppendDoesNotAlias(t *testing.T) {
+	pc := PortCounters{Port: 1, Fields: map[string]uint64{"FECCorrectableBlockCtrLane0": 1, "FECCorrectableBlockCtrLane1": 2}}
+	ss := ToSamples("f", ib.Node{GUID: "0x1"}, pc)
+	if len(ss) != 2 || ss[0].Labels[5].Value != "0" || ss[1].Labels[5].Value != "1" {
+		t.Fatalf("%+v", ss)
+	}
+}

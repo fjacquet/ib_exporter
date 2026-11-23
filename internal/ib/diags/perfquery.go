@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -70,8 +71,9 @@ func ParsePerfquery(out []byte) ([]PortCounters, error) {
 	return res, nil
 }
 
-// MergeCounters merges ext into basic per (GUID, port); ext values win (64-bit
-// data/packets beat the 32-bit ones). Ext-only blocks are appended.
+// MergeCounters merges ext into basic per (GUID, port). Fields in ext64 come from
+// ext only: the 32-bit basic versions saturate and would make rate() flip if
+// -x failed. Ext-only blocks are appended.
 func MergeCounters(basic, ext []PortCounters) []PortCounters {
 	type key struct {
 		guid string
@@ -79,7 +81,7 @@ func MergeCounters(basic, ext []PortCounters) []PortCounters {
 	}
 	out := make([]PortCounters, 0, len(basic))
 	idx := map[key]int{}
-	add := func(pc PortCounters) {
+	add := func(pc PortCounters, fromExt bool) {
 		k := key{pc.GUID, pc.Port}
 		i, ok := idx[k]
 		if !ok {
@@ -88,14 +90,17 @@ func MergeCounters(basic, ext []PortCounters) []PortCounters {
 			i = len(out) - 1
 		}
 		for f, v := range pc.Fields {
+			if !fromExt && ext64[f] {
+				continue
+			}
 			out[i].Fields[f] = v
 		}
 	}
 	for _, pc := range basic {
-		add(pc)
+		add(pc, false)
 	}
 	for _, pc := range ext {
-		add(pc)
+		add(pc, true)
 	}
 	return out
 }
@@ -106,6 +111,10 @@ type metricDef struct {
 	lane  string  // value of the "lane" label; "" when not per lane
 	lanes bool    // metric carries the "lane" label key
 }
+
+// ext64 lists the data/packet fields that have a 64-bit counterpart in -x output.
+var ext64 = map[string]bool{"PortXmitData": true, "PortRcvData": true, "PortXmitPkts": true, "PortRcvPkts": true,
+	"PortUnicastXmitPkts": true, "PortUnicastRcvPkts": true, "PortMulticastXmitPkts": true, "PortMulticastRcvPkts": true}
 
 // perfFields maps perfquery field names to metrics. Unlisted fields are ignored.
 var perfFields = buildPerfFields()
@@ -185,7 +194,7 @@ func ToSamples(fabric string, node ib.Node, pc PortCounters) []ib.Sample {
 		d := perfFields[f]
 		labels := ib.PortLabels(fabric, node, pc.Port)
 		if d.lanes {
-			labels = append(labels, ib.Label{Key: "lane", Value: d.lane})
+			labels = append(slices.Clip(labels), ib.Label{Key: "lane", Value: d.lane})
 		}
 		mult := d.mult
 		if mult == 0 {
