@@ -1,0 +1,22 @@
+---
+server:
+  port: 9449
+  uri: /metrics
+collection:
+  interval: 60s
+  topologyInterval: 10m
+  portInfoInterval: 5m
+  maxConcurrent: 4
+  optionalEvery: 5
+fabrics:
+  - name: prod-ib
+    ca: mlx5_0
+    port: 1
+    nodeNameMap: /etc/ib/node-name-map
+sources:
+  localHCA: true
+  ibswinfo:
+    enabled: false
+    path: /usr/bin/ibswinfo
+replay:
+  dir: ""
