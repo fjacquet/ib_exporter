@@ -124,7 +124,7 @@ Gauges, value 1, refreshed every `collection.topologyInterval`.
 
 | Metric | Type | Labels | Meaning |
 |---|---|---|---|
-| `ib_up` | gauge | `fabric` | 1 when the topology was read this cycle, else 0. A down fabric is data, not a scrape failure. |
+| `ib_up` | gauge | `fabric` | 1 when a topology is available and the fabric answered this cycle: the topology was read, or at least one node's perfquery succeeded on the cached topology. Else 0 (also when a cached topology exists but every perfquery failed). A down fabric is data, not a scrape failure. |
 | `ib_collect_errors_total` | counter | `fabric,reader` | Reader failures since start: one per failing node (or command group), not per command. |
 | `ib_collect_duration_seconds` | gauge | `fabric,reader` | Sum of the reader's exec durations in its last cycle that ran, **including waits for a free exec slot** (`collection.maxConcurrent`). Readers run in parallel, so it is work time, not wall-clock time, and can exceed the interval. Absent until the reader first ran. |
 | `ib_collect_last_success_timestamp_seconds` | gauge | `fabric,reader` | Unix time of the reader's last successful cycle. Absent until it first succeeded. |

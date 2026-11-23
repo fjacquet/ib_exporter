@@ -10,7 +10,7 @@ import (
 
 // help holds exact-name help strings; helpPrefix covers families, longest match first.
 var help = map[string]string{
-	"ib_up":                       "1 when the fabric topology was read this cycle, else 0.",
+	"ib_up":                       "1 when the fabric answered this cycle (topology read, or a perfquery succeeded on the cached topology), else 0.",
 	"ib_collect_duration_seconds": "Sum of the reader's exec durations in the last cycle, including waits for a free exec slot.",
 	"ib_collect_errors_total":     "Reader failures since start (one per failing node or command group).",
 	"ib_collect_last_success_timestamp_seconds": "Unix time of the reader's last successful cycle.",

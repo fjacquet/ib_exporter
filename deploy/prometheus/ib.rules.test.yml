@@ -39,4 +39,4 @@ tests:
           - exp_labels: {severity: critical, fabric: demo}
             exp_annotations:
               summary: "InfiniBand fabric demo topology not readable"
-              description: "ib_up has been 0 for 5m: the exporter cannot run ibnetdiscover (SM down, HCA/port wrong, /dev/infiniband not mounted?)."
+              description: "ib_up has been 0 for 5m: neither ibnetdiscover nor any perfquery succeeded (SM down, HCA/port wrong, /dev/infiniband not mounted or umad access lost?)."

@@ -47,7 +47,7 @@
       "id": 1,
       "type": "stat",
       "title": "Fabrics up",
-      "description": "Fabrics whose topology was read last cycle.",
+      "description": "Fabrics that answered last cycle: topology read, or at least one node answered perfquery.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"

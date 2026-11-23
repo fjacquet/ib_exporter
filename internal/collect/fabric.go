@@ -50,11 +50,13 @@ func newFabricState(f config.Fabric) *fabricState {
 }
 
 func (l *Loop) collectFabric(ctx context.Context, fs *fabricState, now time.Time, optional bool) *ib.FabricSnapshot {
-	up := l.refreshTopology(ctx, fs, now)
+	fresh := l.refreshTopology(ctx, fs, now)
 	var ss []ib.Sample
 	if fs.haveTopo {
 		ss = l.fabricSamples(ctx, fs, now, optional)
 	}
+	// Up: the fabric answered this cycle, by a topology read or at least one node's perfquery.
+	up := fs.haveTopo && (fresh || fs.stats[rdPerf].cycOK)
 	ss = append(ss, ib.Sample{Name: "ib_up", Labels: []ib.Label{{Key: ib.LabelFabric, Value: fs.f.Name}}, Value: b2f(up)})
 	readers := []string{rdTopology, rdPerf, rdOptional, rdPortInfo, rdSM}
 	if l.cfg.Sources.Ibswinfo.Enabled {
@@ -67,11 +69,11 @@ func (l *Loop) collectFabric(ctx context.Context, fs *fabricState, now time.Time
 	return &ib.FabricSnapshot{Fabric: fs.f.Name, Up: up, Nodes: fs.nodes, Links: fs.links, Samples: ss, At: now}
 }
 
-// refreshTopology re-reads the topology when due. A failure keeps the last good
-// topology but reports the fabric down for this cycle; it is retried next cycle.
+// refreshTopology re-reads the topology when due and reports whether it was read this
+// cycle. A failure keeps the last good topology; it is retried next cycle.
 func (l *Loop) refreshTopology(ctx context.Context, fs *fabricState, now time.Time) bool {
 	if fs.haveTopo && now.Sub(fs.topoAt) < l.cfg.Collection.TopologyInterval {
-		return true
+		return false
 	}
 	out, err := l.run(ctx, fs.f, fs.stats[rdTopology], "ibnetdiscover", "-p")
 	if err != nil {

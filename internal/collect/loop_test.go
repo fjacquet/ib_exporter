@@ -318,12 +318,13 @@ func TestLoop_FabricFailureSetsUpZeroOthersContinue(t *testing.T) {
 	require.True(t, snap.Fabrics["b"].Up)
 	one(t, snap.Fabrics["b"].Samples, "ib_port_symbol_error_total", map[string]string{"guid": swGUID, "port": "1"})
 
-	// A later topology failure keeps the stale topology but marks the fabric down.
+	// A later topology failure keeps the stale topology; the fabric stays up while its
+	// nodes still answer perfquery (ib_up ruling), and the failure is counted.
 	r.del(key("b", "ibnetdiscover", "-p"))
 	clk.t = clk.t.Add(10 * time.Minute)
-	require.Error(t, l.Once(context.Background()), "every fabric down")
+	require.NoError(t, l.Once(context.Background()))
 	b := st.Load().Fabrics["b"]
-	require.False(t, b.Up)
+	require.True(t, b.Up)
 	require.Len(t, b.Nodes, 2)
 	one(t, b.Samples, "ib_port_symbol_error_total", map[string]string{"guid": swGUID, "port": "1"})
 	require.InDelta(t, 1, one(t, b.Samples, "ib_collect_errors_total", map[string]string{"reader": "topology"}).Value, 0)
@@ -534,4 +535,40 @@ func TestLoop_CommandTimeoutCountsAsError(t *testing.T) {
 	require.NoError(t, l.Once(context.Background()))
 	e := one(t, st.Load().Fabrics["a"].Samples, "ib_collect_errors_total", map[string]string{"reader": "perfquery"})
 	require.InDelta(t, 1, e.Value, 0, "a timeout is a reader failure, unlike a cancellation")
+}
+
+// ib_up on a cycle that reuses the cached topology depends on perfquery: losing PMA access
+// mid-run must show within one interval, not after the next topology refresh.
+func TestLoop_UpOnCachedTopologyNeedsAPerfquery(t *testing.T) {
+	r := newFake()
+	register(t, r, "a", 1, 2)
+	clk := &clock{time.Unix(1000, 0)}
+	l, st := newLoop(newCfg("a"), r, clk)
+	require.NoError(t, l.Once(context.Background()))
+	require.True(t, st.Load().Fabrics["a"].Up)
+
+	r.del(key("a", "perfquery", "-a", "-l", "2"))
+	r.del(key("a", "perfquery", "-x", "-a", "-l", "2"))
+	clk.t = clk.t.Add(time.Minute)
+	require.NoError(t, l.Once(context.Background()))
+	require.True(t, st.Load().Fabrics["a"].Up, "one node answered")
+
+	r.del(key("a", "perfquery", "-a", "-l", "1"))
+	r.del(key("a", "perfquery", "-x", "-a", "-l", "1"))
+	clk.t = clk.t.Add(time.Minute)
+	require.Error(t, l.Once(context.Background()), "every fabric down")
+	a := st.Load().Fabrics["a"]
+	require.False(t, a.Up, "cached topology and every perfquery failed")
+	require.InDelta(t, 0, one(t, a.Samples, "ib_up", nil).Value, 0)
+	require.Equal(t, 1, r.count(key("a", "ibnetdiscover", "-p")), "topology still cached")
+}
+
+// A fresh topology read with no nodes is up: nothing to query, nothing failed.
+func TestLoop_EmptyTopologyFreshReadIsUp(t *testing.T) {
+	r := newFake()
+	r.set(key("a", "ibnetdiscover", "-p"), "")
+	r.set(key("a", "sminfo"), readTD(t, "sminfo/master.txt"))
+	l, st := newLoop(newCfg("a"), r, &clock{time.Unix(1000, 0)})
+	require.NoError(t, l.Once(context.Background()))
+	require.True(t, st.Load().Fabrics["a"].Up)
 }

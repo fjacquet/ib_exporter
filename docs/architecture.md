@@ -29,8 +29,9 @@ carry the same port GUID, so fabric and local series join. See [ADR 0005](adr/00
 
 ## Snapshot
 
-Per fabric: `Up`, nodes, links, samples. `ib_up{fabric}` is 0 when the topology could not be read;
-the last good topology is kept and retried. A failing node yields absent samples and increments
+Per fabric: `Up`, nodes, links, samples. `ib_up{fabric}` is 1 when a topology is available
+and the fabric answered this cycle (topology read, or at least one node's perfquery succeeded on the
+cached topology), else 0. A failed topology read keeps the last good topology and is retried. A failing node yields absent samples and increments
 `ib_collect_errors_total`; the exporter never emits a fake zero. Slow readers (optional, portinfo, SM)
 cache their samples between runs.
 
