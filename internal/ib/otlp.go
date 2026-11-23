@@ -33,16 +33,22 @@ type otlpBridge struct {
 // NewOTLPBridge registers observable instruments on meter for the store's snapshot.
 func NewOTLPBridge(store *SnapshotStore, meter metric.Meter) error {
 	b := &otlpBridge{store: store, meter: meter, known: map[string]bool{}}
-	return b.sync()
+	return b.sync(alwaysPresent...)
 }
 
-// sync creates instruments for names without one and registers one callback for them.
-func (b *otlpBridge) sync() error {
+// alwaysPresent seeds the first registration: the SDK ignores a callback with no
+// instruments, and only a registered callback can discover names, so a bridge
+// built on an empty store would otherwise never export anything.
+var alwaysPresent = []Sample{{Name: "ib_up"}, {Name: "ib_collect_errors_total", Counter: true}}
+
+// sync creates instruments for names without one (seed first, then the snapshot)
+// and registers one callback for them.
+func (b *otlpBridge) sync(seed ...Sample) error {
 	b.syncMu.Lock()
 	defer b.syncMu.Unlock()
 	insts := map[string]instrument{}
 	var list []metric.Observable
-	for _, s := range exportable(b.store.Load()) {
+	for _, s := range append(seed, exportable(b.store.Load())...) {
 		if _, ok := insts[s.Name]; ok || b.isKnown(s.Name) {
 			continue
 		}

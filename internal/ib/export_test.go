@@ -25,7 +25,7 @@ func TestMetrics_LabelKeySetUniquePerName(t *testing.T) {
 		var keys, vals []string
 		for _, l := range s.Labels {
 			keys, vals = append(keys, l.Key), append(vals, l.Value)
-			if l.Key == "node_type" {
+			if l.Key == "node_type" && strings.HasPrefix(s.Name, "ib_port_") {
 				paths[l.Value] = true
 			}
 		}
@@ -105,6 +105,17 @@ func TestOTLP_ManualReaderMatchesPrometheus(t *testing.T) {
 	_, prom := gatherProm(t, ib.NewSnapshotCollector(st))
 	require.NotEmpty(t, prom)
 	require.Equal(t, sorted(prom), sorted(collectOTLP(t, newOTLP(t, st))))
+}
+
+// The bridge is built before the first collection cycle, on an empty store.
+func TestOTLP_BuiltOnEmptyStoreFollowsLaterSnapshots(t *testing.T) {
+	st := &ib.SnapshotStore{}
+	reader := newOTLP(t, st)
+	require.Empty(t, collectOTLP(t, reader))
+	st.Swap(fullStore(t).Load())
+	_, prom := gatherProm(t, ib.NewSnapshotCollector(st))
+	require.Eventually(t, func() bool { return slices.Equal(sorted(prom), sorted(collectOTLP(t, reader))) },
+		5*time.Second, 10*time.Millisecond)
 }
 
 func TestOTLP_FollowsSnapshotAndLateNames(t *testing.T) {
