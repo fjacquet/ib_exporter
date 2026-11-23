@@ -137,3 +137,27 @@ func TestReadHCA_MissingRoot(t *testing.T) {
 		t.Fatal("want error")
 	}
 }
+
+func TestReadHCA_ExtUnreadableDropsBasicValue(t *testing.T) {
+	root := t.TempDir()
+	if err := os.CopyFS(root, os.DirFS(fixture)); err != nil {
+		t.Fatal(err)
+	}
+	e := filepath.Join(root, "mlx5_0/ports/1/counters_ext/port_rcv_data_64")
+	if err := os.Remove(e); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("/nonexistent", e); err != nil {
+		t.Fatal(err)
+	}
+	ss, err := ReadHCA(root, bind)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s, ok := find(ss, "ib_hca_rcv_data_bytes_total", "mlx5_0"); ok {
+		t.Errorf("rcv data must be absent, got %+v", s)
+	}
+	if _, ok := find(ss, "ib_hca_rcv_packets_total", "mlx5_0"); !ok {
+		t.Error("name without counters_ext file must still use counters/")
+	}
+}

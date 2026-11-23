@@ -36,3 +36,26 @@ func TestReplayRunner_MissingFixture(t *testing.T) {
 		t.Fatalf("err=%v", err)
 	}
 }
+
+func TestReplayRunner_FabricNameCannotEscapeDir(t *testing.T) {
+	parent := t.TempDir()
+	dir := filepath.Join(parent, "dir")
+	if err := os.MkdirAll(filepath.Join(dir, "prod"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []string{filepath.Join(parent, "perfquery__x.txt"), filepath.Join(dir, "perfquery__x.txt"), filepath.Join(parent, "perfquery__...txt")} {
+		if err := os.WriteFile(p, []byte("SECRET"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	r := Runner{Dir: dir}
+	for _, c := range []struct {
+		fabric string
+		args   []string
+	}{{"..", []string{"x"}}, {".", []string{"x"}}, {"../x", []string{"x"}}, {"", []string{"x"}}, {"prod", []string{"../.."}}, {"..", []string{"../.."}}} {
+		out, err := r.Run(context.Background(), config.Fabric{Name: c.fabric}, "perfquery", c.args...)
+		if err == nil || strings.Contains(string(out), "SECRET") {
+			t.Errorf("fabric %q args %v: out=%q err=%v", c.fabric, c.args, out, err)
+		}
+	}
+}

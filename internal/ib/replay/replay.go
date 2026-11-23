@@ -23,8 +23,14 @@ var unsafe = regexp.MustCompile(`[^A-Za-z0-9._-]`)
 
 // Run returns the fixture for the tool and args (without the -C/-P ExecRunner appends).
 func (r Runner) Run(_ context.Context, f config.Fabric, tool string, args ...string) ([]byte, error) {
+	if f.Name == "" || f.Name == "." || f.Name == ".." {
+		return nil, fmt.Errorf("replay: invalid fabric name %q", f.Name)
+	}
 	file := unsafe.ReplaceAllString(tool+"__"+strings.Join(args, "_"), "-") + ".txt"
 	path := filepath.Join(r.Dir, unsafe.ReplaceAllString(f.Name, "-"), file)
+	if rel, err := filepath.Rel(r.Dir, path); err != nil || !filepath.IsLocal(rel) {
+		return nil, fmt.Errorf("replay: fixture path %s escapes %s", path, r.Dir)
+	}
 	b, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("replay: no fixture %s: %w", path, err)

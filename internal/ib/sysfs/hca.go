@@ -62,13 +62,20 @@ func readPort(devDir, dev string, port int, fabric string) []ib.Sample {
 	}
 
 	// counters/ first, then counters_ext/: the 64-bit value replaces the 32-bit one.
+	// A name that has a counters_ext file never falls back to counters/, even when
+	// the ext file is unreadable (the 32-bit value wraps; absent beats alternating).
 	ctr := map[string]float64{}
-	for _, sub := range []string{"counters", "counters_ext"} {
-		for _, f := range files(filepath.Join(pdir, sub)) {
-			if v, ok := readUint(f.path); ok {
-				name, mul := counterName(f.name)
-				ctr[name] = float64(v) * mul
-			}
+	for _, f := range files(filepath.Join(pdir, "counters")) {
+		if v, ok := readUint(f.path); ok {
+			name, mul := counterName(f.name)
+			ctr[name] = float64(v) * mul
+		}
+	}
+	for _, f := range files(filepath.Join(pdir, "counters_ext")) {
+		name, mul := counterName(f.name)
+		delete(ctr, name)
+		if v, ok := readUint(f.path); ok {
+			ctr[name] = float64(v) * mul
 		}
 	}
 	for name, v := range ctr {
