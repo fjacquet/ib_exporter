@@ -54,7 +54,10 @@ func (b *otlpBridge) sync(seed ...Sample) error {
 		}
 		inst, err := b.instrument(s)
 		if err != nil {
-			return err
+			// Skip only this name, and never retry it: one bad name must not block the batch.
+			otel.Handle(err)
+			b.markKnown(s.Name)
+			continue
 		}
 		insts[s.Name] = instrument{inst, s.Counter}
 		list = append(list, inst)
@@ -65,12 +68,16 @@ func (b *otlpBridge) sync(seed ...Sample) error {
 	if _, err := b.meter.RegisterCallback(b.observer(insts), list...); err != nil {
 		return err
 	}
-	b.mu.Lock()
 	for n := range insts {
-		b.known[n] = true
+		b.markKnown(n)
 	}
-	b.mu.Unlock()
 	return nil
+}
+
+func (b *otlpBridge) markKnown(name string) {
+	b.mu.Lock()
+	b.known[name] = true
+	b.mu.Unlock()
 }
 
 // instrument records the kind: SDK instruments satisfy both the counter and gauge interfaces.

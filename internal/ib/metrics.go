@@ -42,9 +42,10 @@ func helpFor(name string) string {
 	return "InfiniBand exporter metric " + name + "."
 }
 
-// Legacy Prometheus charset: also valid OTel instrument names and attribute keys.
+// validName is the intersection of Prometheus names and OTel SDK instrument names
+// (leading letter, at most 255 chars); validLabel is a Prometheus label name.
 var (
-	validName  = regexp.MustCompile(`^[a-zA-Z_:][a-zA-Z0-9_:]*$`)
+	validName  = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]{0,254}$`)
 	validLabel = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 )
 

@@ -1,6 +1,8 @@
 package ib_test
 
 import (
+	"context"
+	"errors"
 	"os"
 	"regexp"
 	"slices"
@@ -12,6 +14,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/testutil"
 	dto "github.com/prometheus/client_model/go"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/metric"
+	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 
 	"github.com/fjacquet/ib_exporter/internal/ib"
 )
@@ -80,6 +84,10 @@ func TestPrometheus_SkipsInvalidSamples(t *testing.T) {
 		{Name: "ib_y_total", Labels: fab("a"), Value: 6, Counter: true},
 		{Name: "ib_y_total", Labels: fab("b"), Value: 7}, // counter then gauge
 		{Name: "ib_z", Labels: []ib.Label{{Key: ib.LabelFabric, Value: "a"}, {Key: ib.LabelFabric, Value: "b"}}, Value: 8},
+		// Valid for Prometheus, rejected by the OTel SDK: must be skipped by both.
+		{Name: "ib:x", Labels: fab("a"), Value: 9},
+		{Name: "_x", Labels: fab("a"), Value: 10},
+		{Name: "i" + strings.Repeat("b", 255), Labels: fab("a"), Value: 11},
 	}}}})
 	_, got := gatherProm(t, ib.NewSnapshotCollector(st))
 	want := []series{
@@ -88,6 +96,36 @@ func TestPrometheus_SkipsInvalidSamples(t *testing.T) {
 	}
 	require.Equal(t, want, sorted(got))
 	require.Equal(t, want, sorted(collectOTLP(t, newOTLP(t, st))), "OTLP skips the same samples")
+}
+
+// rejectingMeter fails gauge creation for one name, as the SDK does for a bad name.
+type rejectingMeter struct {
+	metric.Meter
+	reject string
+}
+
+func (m rejectingMeter) Float64ObservableGauge(name string, opts ...metric.Float64ObservableGaugeOption) (metric.Float64ObservableGauge, error) {
+	g, err := m.Meter.Float64ObservableGauge(name, opts...)
+	if name == m.reject {
+		return g, errors.New("rejected")
+	}
+	return g, err
+}
+
+func TestOTLP_InstrumentErrorSkipsOnlyThatName(t *testing.T) {
+	st := &ib.SnapshotStore{}
+	lbl := []ib.Label{{Key: ib.LabelFabric, Value: "a"}}
+	st.Swap(&ib.Snapshot{Fabrics: map[string]*ib.FabricSnapshot{"a": {Fabric: "a", Samples: []ib.Sample{
+		{Name: "ib_bad", Labels: lbl, Value: 1}, {Name: "ib_good", Labels: lbl, Value: 2},
+	}}}})
+	reader := sdkmetric.NewManualReader()
+	mp := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
+	t.Cleanup(func() { _ = mp.Shutdown(context.Background()) })
+	require.NoError(t, ib.NewOTLPBridge(st, rejectingMeter{Meter: mp.Meter("t"), reject: "ib_bad"}))
+	want := []series{{name: "ib_good", labels: "fabric=a", value: 2}}
+	for range 3 { // never retried into a failing batch
+		require.Equal(t, want, sorted(collectOTLP(t, reader)))
+	}
 }
 
 func TestPrometheus_HelpAndType(t *testing.T) {
