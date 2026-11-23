@@ -3,6 +3,7 @@ package collect
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"os"
 	"slices"
 	"strings"
@@ -600,4 +601,61 @@ func TestLoop_DownedPortKeepsReportingState(t *testing.T) {
 	n := r.count(key("a", "smpquery", "portinfo", "1", "1"))
 	_ = l.Once(context.Background())
 	require.Equal(t, n, r.count(key("a", "smpquery", "portinfo", "1", "1")))
+}
+
+// captureLogs routes slog to a buffer at Info level for the test.
+func captureLogs(t *testing.T) *strings.Builder {
+	t.Helper()
+	var b strings.Builder
+	prev := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&lockedWriter{w: &b}, &slog.HandlerOptions{Level: slog.LevelInfo})))
+	t.Cleanup(func() { slog.SetDefault(prev) })
+	return &b
+}
+
+type lockedWriter struct {
+	mu sync.Mutex
+	w  *strings.Builder
+}
+
+func (w *lockedWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.w.Write(p)
+}
+
+// The real reader error reaches the snapshot (for /health) and a Warn line, logged once per
+// change of text; recovery is logged once.
+func TestLoop_ReaderErrorTextLoggedOnChangeAndInSnapshot(t *testing.T) {
+	logs := captureLogs(t)
+	r := newFake()
+	clk := &clock{time.Unix(1000, 0)}
+	cfg := newCfg("a")
+	cfg.Sources.LocalHCA = true
+	l, st := newLoop(cfg, r, clk, WithHCARoot(t.TempDir()+"/missing"))
+	for range 3 {
+		require.Error(t, l.Once(context.Background()))
+	}
+	snap := st.Load()
+	require.Contains(t, snap.Fabrics["a"].LastErr, "no fixture for a|ibnetdiscover -p")
+	require.False(t, snap.HCAOK)
+	require.Contains(t, snap.HCAErr, "missing")
+	require.Equal(t, 1, strings.Count(logs.String(), `level=WARN msg="reader failed" fabric=a reader=topology`), logs.String())
+	require.Equal(t, 1, strings.Count(logs.String(), `level=WARN msg="reader failed" fabric="" reader=sysfs`), logs.String())
+
+	// Partial failure: the fabric is up, the HCA's perfquery fails, and that is a Warn.
+	register(t, r, "a", 1, 2)
+	r.del(key("a", "perfquery", "-a", "-l", "2"))
+	require.NoError(t, l.Once(context.Background()))
+	a := st.Load().Fabrics["a"]
+	require.True(t, a.Up)
+	require.Contains(t, a.LastErr, "perfquery -a -l 2")
+	require.Equal(t, 1, strings.Count(logs.String(), "level=INFO msg=\"reader recovered\" fabric=a reader=topology"), logs.String())
+	require.Equal(t, 1, strings.Count(logs.String(), "reader=perfquery err="), logs.String())
+
+	register(t, r, "a", 1, 2)
+	clk.t = clk.t.Add(time.Minute)
+	require.NoError(t, l.Once(context.Background()))
+	require.Empty(t, st.Load().Fabrics["a"].LastErr)
+	require.Equal(t, 1, strings.Count(logs.String(), "level=INFO msg=\"reader recovered\" fabric=a reader=perfquery\n"), logs.String())
 }

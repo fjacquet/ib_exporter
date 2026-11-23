@@ -97,12 +97,12 @@ func (l *Loop) Once(ctx context.Context) error {
 		snap.Fabrics[fs.Fabric] = fs
 		up = up || fs.Up
 	}
-	hcaOK := false
 	if l.cfg.Sources.LocalHCA {
-		snap.HCA, hcaOK = l.readHCA(now)
+		snap.HCA, snap.HCAOK = l.readHCA(now)
+		snap.HCAErr = l.sysfs.lastErr
 	}
 	l.store.Swap(snap)
-	if !up && !hcaOK && (len(snaps) > 0 || l.cfg.Sources.LocalHCA) {
+	if !up && !snap.HCAOK && (len(snaps) > 0 || l.cfg.Sources.LocalHCA) {
 		return errors.New("collect: every fabric is down and no local HCA was read")
 	}
 	return nil
@@ -117,7 +117,7 @@ func (l *Loop) readHCA(now time.Time) ([]ib.Sample, bool) {
 	if err != nil {
 		ss = nil
 	}
-	l.sysfs.finish(now)
+	l.sysfs.finish(now, "", "sysfs")
 	return append(ss, l.sysfs.samples("", "sysfs")...), err == nil
 }
 

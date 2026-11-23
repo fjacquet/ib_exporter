@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -58,13 +59,17 @@ type fabricHealth struct {
 func healthHandler(store *ib.SnapshotStore) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		snap := store.Load()
-		fabrics := make([]fabricHealth, 0, len(snap.Fabrics))
+		fabrics := make([]fabricHealth, 0, len(snap.Fabrics)+1)
 		for _, f := range snap.Fabrics {
-			h := fabricHealth{Fabric: f.Fabric, OK: f.Up, LastScrape: f.At.UTC().Format(time.RFC3339)}
-			if !f.Up {
+			h := fabricHealth{Fabric: f.Fabric, OK: f.Up, LastScrape: f.At.UTC().Format(time.RFC3339), Err: errText(f.LastErr)}
+			if !f.Up && h.Err == "" {
 				h.Err = "fabric down: see ib_up and ib_collect_errors_total"
 			}
 			fabrics = append(fabrics, h)
+		}
+		if snap.HCA != nil { // sources.localHCA is on
+			fabrics = append(fabrics, fabricHealth{Fabric: "(local hca)", OK: snap.HCAOK,
+				LastScrape: snap.BuiltAt.UTC().Format(time.RFC3339), Err: errText(snap.HCAErr)})
 		}
 		sort.Slice(fabrics, func(i, j int) bool { return fabrics[i].Fabric < fabrics[j].Fabric })
 		w.Header().Set("Content-Type", "application/json")
@@ -73,6 +78,15 @@ func healthHandler(store *ib.SnapshotStore) http.Handler {
 			"fabrics":  fabrics,
 		})
 	})
+}
+
+// errText keeps the first line of a reader error, at most 300 runes.
+func errText(s string) string {
+	s, _, _ = strings.Cut(s, "\n")
+	if r := []rune(s); len(r) > 300 {
+		s = string(r[:300])
+	}
+	return s
 }
 
 // indexHandler serves the landing page at "/" only; any other path is a 404.

@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
@@ -107,4 +109,44 @@ func TestRegisterEndpoints_ReservedMapDrift(t *testing.T) {
 		registerEndpoints(mux(), cfg, st, reg, map[string]bool{"/": true, "/health": true, "/livez": true, "/other": true})
 	})
 	assert.NotPanics(t, func() { registerEndpoints(mux(), cfg, st, reg, config.ReservedURIs) })
+}
+
+type healthBody struct {
+	Fabrics []struct {
+		Fabric     string `json:"fabric"`
+		OK         bool   `json:"ok"`
+		LastScrape string `json:"last_scrape"`
+		Err        string `json:"err"`
+	} `json:"fabrics"`
+}
+
+// /health carries the real reader error (first line, truncated) and a local HCA entry.
+func TestHealth_RealErrorAndLocalHCA(t *testing.T) {
+	long := "ibnetdiscover: exit status 1: " + strings.Repeat("é", 400) + "\nsecond line"
+	st := &ib.SnapshotStore{}
+	st.Swap(&ib.Snapshot{BuiltAt: time.Unix(100, 0).UTC(),
+		Fabrics: map[string]*ib.FabricSnapshot{"prod": {Fabric: "prod", At: time.Unix(90, 0).UTC(), LastErr: long}},
+		HCA:     []ib.Sample{{Name: "ib_collect_errors_total"}}, HCAErr: "read /sys/class/infiniband: no such file"})
+	rec := get(newMux(t, st), "/health")
+	require.Equal(t, http.StatusOK, rec.Code)
+	var body healthBody
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+	require.Len(t, body.Fabrics, 2)
+	hca, prod := body.Fabrics[0], body.Fabrics[1]
+	assert.Equal(t, "(local hca)", hca.Fabric)
+	assert.False(t, hca.OK)
+	assert.Equal(t, "read /sys/class/infiniband: no such file", hca.Err)
+	assert.Equal(t, "1970-01-01T00:01:40Z", hca.LastScrape)
+	assert.Equal(t, "prod", prod.Fabric)
+	assert.True(t, strings.HasPrefix(prod.Err, "ibnetdiscover: exit status 1: é"))
+	assert.NotContains(t, prod.Err, "second line")
+	assert.Equal(t, 300, utf8.RuneCountInString(prod.Err))
+	assert.True(t, utf8.ValidString(prod.Err))
+}
+
+func TestHealth_NoHCAEntryWithoutLocalHCA(t *testing.T) {
+	var body healthBody
+	require.NoError(t, json.Unmarshal(get(newMux(t, downStore()), "/health").Body.Bytes(), &body))
+	require.Len(t, body.Fabrics, 1)
+	assert.NotEmpty(t, body.Fabrics[0].Err, "a down fabric without recorded text still says why to look")
 }

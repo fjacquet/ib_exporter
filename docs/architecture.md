@@ -29,11 +29,21 @@ carry the same port GUID, so fabric and local series join. See [ADR 0005](adr/00
 
 ## Snapshot
 
-Per fabric: `Up`, nodes, links, samples. `ib_up{fabric}` is 1 when a topology is available
+Per fabric: `Up`, nodes, links, samples, `LastErr`. `ib_up{fabric}` is 1 when a topology is available
 and the fabric answered this cycle (topology read, or at least one node's perfquery succeeded on the
 cached topology), else 0. A failed topology read keeps the last good topology and is retried. A failing node yields absent samples and increments
 `ib_collect_errors_total`; the exporter never emits a fake zero. Slow readers (optional, portinfo, SM)
 cache their samples between runs.
+
+## Errors and `/health`
+
+Each reader keeps its latest error text. It is logged at Warn when the text changes (not every
+cycle) and at Info once when the reader fully succeeds again; `--debug` logs every failure. The
+fabric's `LastErr` is the error of the first failing reader (topology, perfquery, optional,
+portinfo, sm, ibswinfo). `/health` is always HTTP 200 and lists
+`{"fabric", "ok", "last_scrape", "err"}` per fabric, `err` being the first line of that text
+(at most 300 characters). With `sources.localHCA`, an entry `"fabric": "(local hca)"` reports the
+sysfs read.
 
 ## Concurrency and cancellation
 

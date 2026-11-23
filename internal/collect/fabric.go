@@ -62,11 +62,15 @@ func (l *Loop) collectFabric(ctx context.Context, fs *fabricState, now time.Time
 	if l.cfg.Sources.Ibswinfo.Enabled {
 		readers = append(readers, rdIbswinfo)
 	}
+	lastErr := ""
 	for _, r := range readers {
-		fs.stats[r].finish(now)
+		fs.stats[r].finish(now, fs.f.Name, r)
 		ss = append(ss, fs.stats[r].samples(fs.f.Name, r)...)
+		if lastErr == "" {
+			lastErr = fs.stats[r].lastErr
+		}
 	}
-	return &ib.FabricSnapshot{Fabric: fs.f.Name, Up: up, Nodes: fs.nodes, Links: fs.links, Samples: ss, At: now}
+	return &ib.FabricSnapshot{Fabric: fs.f.Name, Up: up, Nodes: fs.nodes, Links: fs.links, Samples: ss, At: now, LastErr: lastErr}
 }
 
 // refreshTopology re-reads the topology when due and reports whether it was read this
