@@ -13,7 +13,7 @@ services:
       - "9449:9449"
     volumes:
       - ./deploy/demo/config.yaml:/etc/ib_exporter/config.yaml:ro
-      # Recorded infiniband-diags output: the demo needs no InfiniBand hardware.
+      # Hand-written (not captured from hardware) infiniband-diags output: no InfiniBand hardware needed.
       - ./deploy/demo/replay:/replay:ro
     # REAL hardware (instead of the replay demo): use your own config.yaml without
     # `replay.dir`, drop the /replay mount above, and uncomment:

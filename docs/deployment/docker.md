@@ -13,7 +13,7 @@ default `admin`, five provisioned dashboards, see [dashboards](../dashboards.md)
 Copy `.env.example` to `.env` to change the password or image tag.
 
 The exporter runs in replay mode: `deploy/demo/config.yaml` sets `replay.dir: /replay`, and
-`deploy/demo/replay/demo/` holds recorded-style `infiniband-diags` output for a small fabric
+`deploy/demo/replay/demo/` holds hand-written (not captured from hardware, see `deploy/demo/replay/README.md`) `infiniband-diags` output for a small fabric
 (2 leaf switches, 4 HCAs, one dual-port; the SM is on `leaf1`). File naming is described in
 `internal/ib/replay/README.md`. The fixtures are static, so counters never change and every
 `rate()` reads 0 in the demo; `increase()` alerts therefore stay quiet, while the noisy ports

@@ -107,5 +107,6 @@ clean-dist:
 check-deploy:
 	promtool check rules deploy/prometheus/ib.rules.yml
 	promtool check config prometheus.yml
+	promtool test rules deploy/prometheus/ib.rules.test.yml
 	for f in grafana/dashboards/*.json; do python3 -c 'import json,sys; json.load(open(sys.argv[1]))' $$f || exit 1; done
 	python3 deploy/check-metric-names.py

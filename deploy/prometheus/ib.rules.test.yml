@@ -1,0 +1,42 @@
+rule_files:
+  - ib.rules.yml
+evaluation_interval: 1m
+tests:
+  - interval: 1m
+    input_series:
+      # f1: stable SM. f2: SM A, then SM B takes over at minute 30.
+      - series: 'ib_sm_info{fabric="f1",sm_guid="A",sm_lid="1"}'
+        values: '1x60'
+      - series: 'ib_sm_info{fabric="f2",sm_guid="A",sm_lid="1"}'
+        values: '1x29 _x31'
+      - series: 'ib_sm_info{fabric="f2",sm_guid="B",sm_lid="2"}'
+        values: '_x30 1x30'
+    alert_rule_test:
+      - eval_time: 40m
+        alertname: IBSubnetManagerChanged
+        exp_alerts:
+          - exp_labels: {severity: warning, fabric: f2, sm_guid: B, sm_lid: "2"}
+            exp_annotations:
+              summary: "Subnet manager changed on fabric f2"
+              description: "A new ib_sm_info series (sm_guid/sm_lid) appeared within the last 15m: SM failover or SM restart with a different identity. A vanishing SM is not detected here (also fires once after an exporter or Prometheus restart)."
+      - eval_time: 55m
+        alertname: IBSubnetManagerChanged
+        exp_alerts: []
+  - interval: 1m
+    input_series:
+      - series: 'ib_up{fabric="demo"}'
+        values: '1x10 0x20'
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: IBFabricDown
+        exp_alerts: []
+      - eval_time: 14m
+        alertname: IBFabricDown
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: IBFabricDown
+        exp_alerts:
+          - exp_labels: {severity: critical, fabric: demo}
+            exp_annotations:
+              summary: "InfiniBand fabric demo topology not readable"
+              description: "ib_up has been 0 for 5m: the exporter cannot run ibnetdiscover (SM down, HCA/port wrong, /dev/infiniband not mounted?)."
