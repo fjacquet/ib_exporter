@@ -95,3 +95,15 @@ func TestValidate_SampleConfigAndDefaults(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, c.Validate())
 }
+
+func TestLoad_UnknownKeyIsError(t *testing.T) {
+	_, err := Load(write(t, "collection: {maxConcurent: 8}\nsources: {localHCA: true}\n"))
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "maxConcurent")
+}
+
+func TestLoad_ShippedConfigStillLoads(t *testing.T) {
+	c, err := Load("../../config.yaml")
+	require.NoError(t, err)
+	require.NoError(t, c.Validate())
+}

@@ -2,7 +2,10 @@
 package config
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"time"
 
@@ -65,7 +68,9 @@ func Load(path string) (*Config, error) {
 			PortInfoInterval: 5 * time.Minute, MaxConcurrent: 4, OptionalEvery: 5,
 		},
 	}
-	if err := yaml.Unmarshal(b, c); err != nil {
+	dec := yaml.NewDecoder(bytes.NewReader(b))
+	dec.KnownFields(true)
+	if err := dec.Decode(c); err != nil && !errors.Is(err, io.EOF) { // io.EOF: empty file, defaults apply
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
 	c.Server.URI = os.ExpandEnv(c.Server.URI)
