@@ -4,6 +4,7 @@ go 1.26.4
 
 require (
 	github.com/stretchr/testify v1.11.1
+	golang.org/x/sync v0.25.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
