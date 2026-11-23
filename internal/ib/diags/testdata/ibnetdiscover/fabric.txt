@@ -1,0 +1,10 @@
+SW   101  1 0x0002c90300aa0001 4x EDR - CA    11  1 0x0002c90300bb0001 ( 'spine1' - 'node01 HCA-1' )
+SW   101  2 0x0002c90300aa0001 4x EDR - CA    12  1 0x0002c90300bb0002 ( 'spine1' - 'node02 "mlx5_0"' )
+SW   101  3 0x0002c90300aa0001 4x EDR - SW   102  3 0x0002c90300aa0002 ( 'spine1' - 'leaf2' )
+SW   101  4 0x0002c90300aa0001 4x EDR
+SW   102  1 0x0002c90300aa0002 4x EDR - CA    13  1 0x0002c90300bb0003 ( 'leaf2' - 'node01 HCA-1' )
+SW   102  3 0x0002c90300aa0002 4x EDR - SW   101  3 0x0002c90300aa0001 ( 'leaf2' - 'spine1' )
+this line is garbage and must be ignored
+CA    11  1 0x0002c90300bb0001 4x EDR - SW   101  1 0x0002c90300aa0001 ( 'node01 HCA-1' - 'spine1' )
+CA    12  1 0x0002c90300bb0002 4x EDR - SW   101  2 0x0002c90300aa0001 ( 'node02 "mlx5_0"' - 'spine1' )
+CA    13  1 0x0002c90300bb0003 4x EDR - SW   102  1 0x0002c90300aa0002 ( 'node01 HCA-1' - 'leaf2' )
