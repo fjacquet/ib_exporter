@@ -61,12 +61,14 @@ User agreed on C with the `fabric` label. Rationale: lowest risk given no hardwa
 |---|---|---|
 | Topology | `ibnetdiscover -p` (`-C -P` per fabric) | slow (default 10m) |
 | PortCounters | `perfquery -x -a -l <lid>` per node; see decimation | fast (default 60s) |
-| PortOptional | `perfquery -T`, `-E`, `-D`, `--rcvcc`, `--xmitcc`, `--slrcvfecn/becn` | every Nth cycle (decimation) |
+| PortOptional | `perfquery -T`, `-E`, `-D`, `--rcvcc`, `--xmitcc` | every Nth cycle (decimation) |
 | PortInfo | `smpquery portinfo` / `nodeinfo` | medium (default 5m) |
 | SM | `saquery -s` / `sminfo` | medium |
 | Switch health | `ibswinfo -d lid-<LID>`, optional | slow |
 | LocalHCA | sysfs `/sys/class/infiniband` | fast |
 | Replay | fixture directory, same interfaces | demo and tests |
+
+Reconciled with the implementation: `--slrcvfecn`, `--slrcvbecn` and `--vlxmittimecc` (per-SL/VL tables) are not read or exported; FECN/BECN come from `--rcvcc`.
 
 Corrections confirmed with rdma-core docs (context7): `-a` alone aggregates ports; per-port needs `-a -l`.
 Data counters are units of 4 octets: multiply by 4 for `_bytes_total`.
