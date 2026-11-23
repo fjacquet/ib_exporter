@@ -57,7 +57,7 @@ func (l *Loop) Run(ctx context.Context) {
 	t := time.NewTicker(l.cfg.Collection.Interval)
 	defer t.Stop()
 	for {
-		if err := l.Once(ctx); err != nil {
+		if err := l.Once(ctx); err != nil && ctx.Err() == nil {
 			slog.Warn("collection cycle", "err", err)
 		}
 		select {
@@ -86,6 +86,10 @@ func (l *Loop) Once(ctx context.Context) error {
 		})
 	}
 	_ = g.Wait() // goroutines always return nil
+	// A cancelled cycle saw killed execs, not a down fabric: keep the last good snapshot.
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 
 	snap := &ib.Snapshot{Fabrics: make(map[string]*ib.FabricSnapshot, len(snaps)), BuiltAt: now}
 	up := false

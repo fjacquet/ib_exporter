@@ -484,3 +484,34 @@ func TestLoop_RunCyclesUntilCancelled(t *testing.T) {
 	<-done
 	require.True(t, st.Load().Fabrics["a"].Up)
 }
+
+// ctxRunner fails every call with ctx.Err() once ctx is done, like a killed exec.
+type ctxRunner struct{ *fakeRunner }
+
+func (r ctxRunner) Run(ctx context.Context, f config.Fabric, tool string, args ...string) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	return r.fakeRunner.Run(ctx, f, tool, args...)
+}
+
+func TestLoop_CancelledCycleDoesNotSwap(t *testing.T) {
+	r := newFake()
+	register(t, r, "a", 5, 6)
+	clk := &clock{t: time.Unix(1000, 0)}
+	st := &ib.SnapshotStore{}
+	l := NewCollectionLoop(newCfg("a"), ctxRunner{r}, st, WithClock(clk.now), WithHCARoot(t.TempDir()))
+	require.NoError(t, l.Once(context.Background()))
+	good := st.Load()
+	require.True(t, good.Fabrics["a"].Up)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	err := l.Once(ctx)
+	require.ErrorIs(t, err, context.Canceled)
+	require.Same(t, good, st.Load(), "a cancelled cycle must not replace the snapshot")
+
+	require.NoError(t, l.Once(context.Background()))
+	e := one(t, st.Load().Fabrics["a"].Samples, "ib_collect_errors_total", map[string]string{"reader": "perfquery"})
+	require.InDelta(t, 0, e.Value, 0, "errors caused only by cancellation are not counted")
+}

@@ -1,6 +1,8 @@
 package collect
 
 import (
+	"context"
+	"errors"
 	"log/slog"
 	"time"
 
@@ -22,6 +24,9 @@ type readerStat struct {
 
 // record counts err as one error, or marks the reader successful this cycle.
 func (s *readerStat) record(err error) {
+	if errors.Is(err, context.Canceled) {
+		return // shutdown or reload, not a reader failure; the cycle is discarded
+	}
 	if err != nil {
 		s.errors++
 		slog.Debug("reader failed", "err", err)
