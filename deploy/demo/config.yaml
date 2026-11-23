@@ -1,0 +1,21 @@
+# Demo: no InfiniBand hardware needed. The exporter reads hand-written
+# infiniband-diags output from replay.dir/<fabric name>/.
+server:
+  port: 9449
+  uri: /metrics
+collection:
+  interval: 15s
+  topologyInterval: 1m
+  portInfoInterval: 1m
+  maxConcurrent: 4
+  optionalEvery: 2
+fabrics:
+  - name: demo
+    ca: mlx5_0
+    port: 1
+sources:
+  localHCA: false
+  ibswinfo:
+    enabled: false
+replay:
+  dir: /replay

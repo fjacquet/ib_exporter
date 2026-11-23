@@ -1,0 +1,51 @@
+# Port info: Lid 11 port 1
+Mkey:............................0x0000000000000000
+GidPrefix:.......................0xfe80000000000000
+Lid:.............................11
+SMLid:...........................1
+CapMask:.........................0xa651e848
+DiagCode:........................0x0000
+MkeyLeasePeriod:.................0
+LocalPort:.......................1
+LinkWidthEnabled:................1X or 4X
+LinkWidthSupported:..............1X or 4X
+LinkWidthActive:.................4X
+LinkSpeedSupported:..............2.5 Gbps or 5.0 Gbps or 10.0 Gbps
+LinkState:.......................Active
+PhysLinkState:...................LinkUp
+LinkDownDefState:................Polling
+ProtectBits:.....................0
+LMC:.............................0
+LinkSpeedActive:.................Extended speed
+LinkSpeedEnabled:................Extended speed
+NeighborMTU:.....................4096
+SMSL:............................0
+VLCap:...........................VL0-7
+InitType:........................0x00
+VLHighLimit:.....................0
+VLArbHighCap:....................8
+VLArbLowCap:.....................8
+InitReply:.......................0x00
+MtuCap:..........................4096
+VLStallCount:....................0
+HoqLife:.........................31
+OperVLs:.........................VL0-7
+PartEnforceInb:..................0
+PartEnforceOutb:.................0
+FilterRawInb:....................0
+FilterRawOutb:...................0
+MkeyViolations:..................0
+PkeyViolations:..................0
+QkeyViolations:..................0
+GuidCap:.........................8
+ClientReregister:................0
+McastPkeyTrapSuppressionEnabled:.0
+SubnetTimeout:...................18
+RespTimeVal:.....................16
+LocalPhysErr:....................8
+OverrunErr:......................8
+MaxCreditHint:...................0
+RoundTrip:.......................0
+LinkSpeedExtActive:..............53.125 Gbps
+LinkSpeedExtSupported:...........14.0625 Gbps or 25.78125 Gbps or 53.125 Gbps
+LinkSpeedExtEnabled:.............14.0625 Gbps or 25.78125 Gbps or 53.125 Gbps

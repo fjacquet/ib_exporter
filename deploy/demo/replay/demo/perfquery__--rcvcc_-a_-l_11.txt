@@ -1,0 +1,3 @@
+# PortRcvConCtrl counters: Lid 11 port 1
+PortPktRcvFECN:..................10
+PortPktRcvBECN:..................5

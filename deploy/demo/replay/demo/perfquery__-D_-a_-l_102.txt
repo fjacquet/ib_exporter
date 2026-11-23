@@ -1,0 +1,15 @@
+# PortXmitDiscardDetails counters: Lid 102 port 1
+PortInactiveDiscards:............0
+PortNeighborMTUDiscards:.........0
+PortSwLifetimeLimitDiscards:.....0
+PortSwHOQLifetimeLimitDiscards:..0
+# PortXmitDiscardDetails counters: Lid 102 port 2
+PortInactiveDiscards:............0
+PortNeighborMTUDiscards:.........0
+PortSwLifetimeLimitDiscards:.....0
+PortSwHOQLifetimeLimitDiscards:..0
+# PortXmitDiscardDetails counters: Lid 102 port 5
+PortInactiveDiscards:............0
+PortNeighborMTUDiscards:.........0
+PortSwLifetimeLimitDiscards:.....1100
+PortSwHOQLifetimeLimitDiscards:..100

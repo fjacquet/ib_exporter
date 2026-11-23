@@ -1,0 +1,7 @@
+# PortRcvErrorDetails counters: Lid 14 port 1
+PortLocalPhysicalErrors:.........0
+PortMalformedPktErrors:..........0
+PortBufferOverrunErrors:.........0
+PortDLIDMappingErrors:...........0
+PortVLMappingErrors:.............0
+PortLoopingErrors:...............0

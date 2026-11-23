@@ -1,0 +1,8 @@
+bin/
+.git/
+docs/
+*.md
+deploy/demo/replay/
+.superpowers/
+coverage.out
+.env

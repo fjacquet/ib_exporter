@@ -1,0 +1,12 @@
+# PortXmitConCtrl counters: Lid 102 port 1
+PortXmitTimeCong:................300
+# PortRcvConCtrl counters: Lid 102 port 2
+PortPktRcvFECN:..................10
+PortPktRcvBECN:..................5
+# PortXmitConCtrl counters: Lid 102 port 2
+PortXmitTimeCong:................300
+# PortRcvConCtrl counters: Lid 102 port 5
+PortPktRcvFECN:..................9000
+PortPktRcvBECN:..................7000
+# PortXmitConCtrl counters: Lid 102 port 5
+PortXmitTimeCong:................800000

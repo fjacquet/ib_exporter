@@ -1,0 +1,26 @@
+# Used by GoReleaser (dockers_v2). The binary is cross-compiled by the build pipe;
+# buildx lays it out per-platform as ${TARGETPLATFORM}/ib_exporter in the context.
+# For local/dev builds from source, use the multi-stage ./Dockerfile instead.
+# Debian slim, not Alpine: the infiniband-diags tools are glibc binaries.
+FROM docker.io/library/debian:trixie-slim
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends infiniband-diags curl ca-certificates && \
+    apt-cache policy infiniband-diags && \
+    rm -rf /var/lib/apt/lists/* && \
+    groupadd --gid 10001 ib && \
+    useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin ib
+
+ARG TARGETPLATFORM
+COPY ${TARGETPLATFORM}/ib_exporter /ib_exporter
+COPY config.yaml /etc/ib_exporter/config.yaml
+
+EXPOSE 9449
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -fsS http://127.0.0.1:9449/livez || exit 1
+
+USER ib
+
+ENTRYPOINT ["/ib_exporter"]
+CMD ["--config", "/etc/ib_exporter/config.yaml"]

@@ -61,12 +61,14 @@ User agreed on C with the `fabric` label. Rationale: lowest risk given no hardwa
 |---|---|---|
 | Topology | `ibnetdiscover -p` (`-C -P` per fabric) | slow (default 10m) |
 | PortCounters | `perfquery -x -a -l <lid>` per node; see decimation | fast (default 60s) |
-| PortOptional | `perfquery -T`, `-E`, `-D`, `--rcvcc`, `--xmitcc`, `--slrcvfecn/becn` | every Nth cycle (decimation) |
+| PortOptional | `perfquery -T`, `-E`, `-D`, `--rcvcc`, `--xmitcc` | every Nth cycle (decimation) |
 | PortInfo | `smpquery portinfo` / `nodeinfo` | medium (default 5m) |
 | SM | `saquery -s` / `sminfo` | medium |
 | Switch health | `ibswinfo -d lid-<LID>`, optional | slow |
 | LocalHCA | sysfs `/sys/class/infiniband` | fast |
 | Replay | fixture directory, same interfaces | demo and tests |
+
+Reconciled with the implementation: `--slrcvfecn`, `--slrcvbecn` and `--vlxmittimecc` (per-SL/VL tables) are not read or exported; FECN/BECN come from `--rcvcc`.
 
 Corrections confirmed with rdma-core docs (context7): `-a` alone aggregates ports; per-port needs `-a -l`.
 Data counters are units of 4 octets: multiply by 4 for `_bytes_total`.
@@ -76,7 +78,7 @@ Exact `-T` field names (per-lane FEC, sync header, unlocked block): **still unkn
 
 ### Identity
 
-Series key = `fabric` + node GUID + port number. Each cycle resolves GUID→LID from the latest topology
+Series key = `fabric` + GUID + port number. **Amendment 2026-11-23 (Task 3 review ruling):** `ibnetdiscover -p` carries only port GUIDs. For switches all ports share the switch GUID, so GUID = node GUID. For HCAs `guid` is the **port GUID**, which is also what `perfquery -G` addresses; a dual-port HCA therefore shows as two `guid` values, grouped by `node_name`. Local sysfs series carry the same `guid` (port GUID, from `ports/<n>/gids/0`) plus `node_guid` in `ib_hca_info`, so fabric and local series join. A node-name-map must list port GUIDs for HCAs. Each cycle resolves GUID→LID from the latest topology
 snapshot. A stale LID that fails yields an absent sample for that node and increments
 `ib_collect_errors_total{fabric,reader}`.
 

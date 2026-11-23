@@ -1,0 +1,34 @@
+# Build artifacts
+bin/
+dist/
+vendor/
+coverage.out
+coverage.html
+/ib_exporter
+
+# Logs
+log/
+*.log
+
+# Docs build (mkdocs)
+site/
+
+# Local config & secrets — never commit
+.env
+*.local.yaml
+.claude.local.md
+.claude/settings.local.json
+
+# Editor / OS noise
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Local tooling state
+.rtk/
+
+
+# SDD working files
+.superpowers/

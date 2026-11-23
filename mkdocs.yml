@@ -1,0 +1,32 @@
+site_name: ib_exporter
+site_description: Prometheus and OTLP exporter for InfiniBand fabrics (switches, HCAs, topology, subnet manager)
+repo_url: https://github.com/fjacquet/ib_exporter
+repo_name: fjacquet/ib_exporter
+exclude_docs: |
+  superpowers/
+theme:
+  name: material
+  features: [navigation.sections, navigation.top, content.code.copy]
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight
+  - pymdownx.superfences
+nav:
+  - Home: index.md
+  - Configuration: configuration.md
+  - Architecture: architecture.md
+  - Metrics: metrics.md
+  - Dashboards: dashboards.md
+  - Deployment:
+      - Docker: deployment/docker.md
+  - ADRs:
+      - Index: adr/README.md
+      - 0001 Snapshot model: adr/0001-snapshot-model.md
+      - 0002 Dual export: adr/0002-dual-export.md
+      - 0003 Client choice: adr/0003-client-choice.md
+      - 0004 Counters as _total: adr/0004-counters-as-total.md
+      - 0005 Identity: adr/0005-identity.md
+      - 0006 Label union: adr/0006-label-union.md
+      - 0007 Debian base: adr/0007-debian-base-image.md
+      - 0008 UMAD access: adr/0008-umad-device-access.md
+      - 0009 Concurrency: adr/0009-concurrency-and-cancellation.md

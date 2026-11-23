@@ -1,0 +1,1 @@
+sminfo: sm lid 101 sm guid 0x0002c90300aa0001, activity count 482910 priority 14 state 3 SMINFO_MASTER
