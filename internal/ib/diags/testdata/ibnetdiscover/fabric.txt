@@ -8,3 +8,4 @@ this line is garbage and must be ignored
 CA    11  1 0x0002c90300bb0001 4x EDR - SW   101  1 0x0002c90300aa0001 ( 'node01 HCA-1' - 'spine1' )
 CA    12  1 0x0002c90300bb0002 4x EDR - SW   101  2 0x0002c90300aa0001 ( 'node02 "mlx5_0"' - 'spine1' )
 CA    13  1 0x0002c90300bb0003 4x EDR - SW   102  1 0x0002c90300aa0002 ( 'node01 HCA-1' - 'leaf2' )
+CA    14  1 0x0002c90300bb0004 4x 14.0625 Gbps - SW   101  5 0x0002c90300aa0001 ( 'node04 HCA-1' - 'spine1' )

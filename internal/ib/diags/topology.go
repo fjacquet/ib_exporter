@@ -17,7 +17,7 @@ import (
 // Format of `ibnetdiscover -p` (rdma-core dump_ports_report):
 //
 //	SW   101  1 0x... 4x EDR - CA 11 1 0x... ( 'local' - 'remote' )
-var portLine = regexp.MustCompile(`^(SW|CA|RT)\s+(\d+)\s+(\d+)\s+(0x[0-9a-fA-F]+)\s+\S+\s+\S+` +
+var portLine = regexp.MustCompile(`^(SW|CA|RT)\s+(\d+)\s+(\d+)\s+(0x[0-9a-fA-F]+)\s+.+?` +
 	`(?:\s+-\s+(?:SW|CA|RT)\s+\d+\s+(\d+)\s+(0x[0-9a-fA-F]+)\s+\(\s*'(.*)'\s+-\s+'(.*)'\s*\))?` +
 	`\s*(?:'(.*)')?\s*$`)
 
@@ -32,9 +32,14 @@ func ParseTopology(out []byte, nameMap map[string]string) ([]ib.Node, []ib.Link,
 	var links []ib.Link
 	sc := bufio.NewScanner(bytes.NewReader(out))
 	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	candidates := 0
 	for sc.Scan() {
-		m := portLine.FindStringSubmatch(strings.TrimSpace(sc.Text()))
+		line := strings.TrimSpace(sc.Text())
+		m := portLine.FindStringSubmatch(line)
 		if m == nil {
+			if strings.HasPrefix(line, "CA") || strings.HasPrefix(line, "SW") {
+				candidates++
+			}
 			continue
 		}
 		lid, _ := strconv.ParseUint(m[2], 10, 16)
@@ -63,6 +68,9 @@ func ParseTopology(out []byte, nameMap map[string]string) ([]ib.Node, []ib.Link,
 	}
 	if err := sc.Err(); err != nil {
 		return nil, nil, fmt.Errorf("scan topology: %w", err)
+	}
+	if len(nodes) == 0 && candidates > 0 {
+		return nil, nil, fmt.Errorf("no ibnetdiscover port lines parsed from %d CA/SW lines: unknown format", candidates)
 	}
 	resolve := func(guid string) string {
 		if n := nameMap[guid]; n != "" {
