@@ -5,11 +5,13 @@ import (
 	"context"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/fjacquet/ib_exporter/internal/config"
 	"github.com/fjacquet/ib_exporter/internal/ib"
+	"github.com/fjacquet/ib_exporter/internal/ib/diags"
 )
 
 func TestOnceDebug_PrintsSortedSamples(t *testing.T) {
@@ -45,4 +47,19 @@ func TestSupervisor_RestartReplacesLoop(t *testing.T) {
 	assert.Eventually(t, func() bool { return starts.Load() == 2 && running.Load() == 1 }, 2e9, 5e6)
 	s.stop()
 	assert.Zero(t, running.Load())
+}
+
+func TestSupervisor_StopIsBounded(t *testing.T) {
+	block := make(chan struct{})
+	defer close(block)
+	s := &supervisor{stopTimeout: 50 * time.Millisecond, start: func(context.Context, *config.Config) { <-block }}
+	s.restart(context.Background(), &config.Config{})
+	start := time.Now()
+	s.stop()
+	assert.Less(t, time.Since(start), 2*time.Second, "a loop that ignores cancellation must not block shutdown")
+}
+
+func TestNewRunner_CommandTimeout(t *testing.T) {
+	r := newRunner(&config.Config{Collection: config.Collection{CommandTimeout: 7 * time.Second}}, false)
+	assert.Equal(t, 7*time.Second, r.(*diags.ExecRunner).Timeout)
 }

@@ -8,6 +8,7 @@ collection:
   portInfoInterval: 5m
   maxConcurrent: 4
   optionalEvery: 5
+  commandTimeout: 30s
 fabrics:
   - name: prod-ib
     ca: mlx5_0

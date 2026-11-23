@@ -123,10 +123,11 @@ func run(o options) error {
 // supervisor runs one collection loop at a time; restart replaces it with a
 // loop over a new config on the same store.
 type supervisor struct {
-	start  func(context.Context, *config.Config)
-	mu     sync.Mutex
-	cancel context.CancelFunc
-	done   chan struct{}
+	start       func(context.Context, *config.Config)
+	stopTimeout time.Duration // bound on waiting for a cancelled loop; 0 means 15s
+	mu          sync.Mutex
+	cancel      context.CancelFunc
+	done        chan struct{}
 }
 
 func (s *supervisor) restart(parent context.Context, c *config.Config) {
@@ -148,10 +149,21 @@ func (s *supervisor) stop() {
 	s.stopLocked()
 }
 
-// stopLocked cancels the running loop and waits for it, so two never overlap.
+// stopLocked cancels the running loop and waits for it, so two do not overlap, but
+// only up to stopTimeout: a stuck loop must not block reload or shutdown. Its
+// cancelled cycle never swaps a snapshot, so an overlap cannot publish stale data.
 func (s *supervisor) stopLocked() {
-	if s.cancel != nil {
-		s.cancel()
-		<-s.done
+	if s.cancel == nil {
+		return
+	}
+	s.cancel()
+	d := s.stopTimeout
+	if d == 0 {
+		d = 15 * time.Second
+	}
+	select {
+	case <-s.done:
+	case <-time.After(d):
+		slog.Warn("collection loop did not stop in time; continuing without it", "timeout", d)
 	}
 }

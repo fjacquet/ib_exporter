@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/fjacquet/ib_exporter/internal/config"
 )
@@ -27,6 +28,8 @@ var diagsTools = map[string]bool{
 
 // ExecRunner runs tools through os/exec, appending -C <CA> -P <Port> for infiniband-diags tools.
 type ExecRunner struct {
+	// Timeout bounds each command (0: none). A timeout is a reader error, not a cancellation.
+	Timeout time.Duration
 	// Trace, when set, receives every command line with its stdout and error.
 	Trace func(cmd string, out []byte, err error)
 }
@@ -37,11 +40,24 @@ func (r *ExecRunner) Run(ctx context.Context, f config.Fabric, tool string, args
 	if diagsTools[filepath.Base(tool)] {
 		full = append(full, "-C", f.CA, "-P", strconv.Itoa(f.Port))
 	}
-	cmd := exec.CommandContext(ctx, tool, full...)
+	cctx := ctx
+	if r.Timeout > 0 {
+		var cancel context.CancelFunc
+		cctx, cancel = context.WithTimeout(ctx, r.Timeout)
+		defer cancel()
+	}
+	cmd := exec.CommandContext(cctx, tool, full...)
+	cmd.WaitDelay = 2 * time.Second // a killed script's child may still hold stdout
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &stdout, &stderr
 	err := cmd.Run()
-	if err != nil {
+	switch {
+	case err == nil:
+	case ctx.Err() != nil: // shutdown or reload: report the cancellation itself
+		err = fmt.Errorf("%s: %w", tool, ctx.Err())
+	case cctx.Err() != nil:
+		err = fmt.Errorf("%s: timed out after %s: %w", tool, r.Timeout, cctx.Err())
+	default:
 		err = fmt.Errorf("%s: %w: %s", tool, err, strings.TrimSpace(stderr.String()))
 	}
 	if r.Trace != nil {

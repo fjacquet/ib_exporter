@@ -23,6 +23,7 @@ type Collection struct {
 	PortInfoInterval time.Duration `yaml:"portInfoInterval"`
 	MaxConcurrent    int           `yaml:"maxConcurrent"`
 	OptionalEvery    int           `yaml:"optionalEvery"`
+	CommandTimeout   time.Duration `yaml:"commandTimeout"`
 }
 
 type Fabric struct {
@@ -66,6 +67,7 @@ func Load(path string) (*Config, error) {
 		Collection: Collection{
 			Interval: 60 * time.Second, TopologyInterval: 10 * time.Minute,
 			PortInfoInterval: 5 * time.Minute, MaxConcurrent: 4, OptionalEvery: 5,
+			CommandTimeout: 30 * time.Second,
 		},
 	}
 	dec := yaml.NewDecoder(bytes.NewReader(b))

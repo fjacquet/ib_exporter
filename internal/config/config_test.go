@@ -26,6 +26,7 @@ func TestLoad_Defaults(t *testing.T) {
 	require.Equal(t, 5*time.Minute, c.Collection.PortInfoInterval)
 	require.Equal(t, 4, c.Collection.MaxConcurrent)
 	require.Equal(t, 5, c.Collection.OptionalEvery)
+	require.Equal(t, 30*time.Second, c.Collection.CommandTimeout)
 }
 
 func TestLoad_ExpandsEnv(t *testing.T) {
@@ -65,7 +66,7 @@ func TestValidate_EmptyFabricsAllowedWithLocalHCA(t *testing.T) {
 }
 
 func validCollection() Collection {
-	return Collection{Interval: time.Minute, TopologyInterval: time.Minute, PortInfoInterval: time.Minute, MaxConcurrent: 1, OptionalEvery: 1}
+	return Collection{Interval: time.Minute, TopologyInterval: time.Minute, PortInfoInterval: time.Minute, MaxConcurrent: 1, OptionalEvery: 1, CommandTimeout: time.Second}
 }
 
 func TestValidate_CollectionAndFabricFields(t *testing.T) {
@@ -75,6 +76,7 @@ func TestValidate_CollectionAndFabricFields(t *testing.T) {
 		"portInfoInterval": func(c *Config) { c.Collection.PortInfoInterval = 0 },
 		"maxConcurrent":    func(c *Config) { c.Collection.MaxConcurrent = 0 },
 		"optionalEvery":    func(c *Config) { c.Collection.OptionalEvery = 0 },
+		"commandTimeout":   func(c *Config) { c.Collection.CommandTimeout = 0 },
 		"ca":               func(c *Config) { c.Fabrics[0].CA = "" },
 		"port":             func(c *Config) { c.Fabrics[0].Port = 0 },
 		"ibswinfo":         func(c *Config) { c.Sources.Ibswinfo = Ibswinfo{Enabled: true} },

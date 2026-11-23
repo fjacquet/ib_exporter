@@ -37,8 +37,9 @@ cache their samples between runs.
 ## Concurrency and cancellation
 
 `collection.maxConcurrent` bounds in-flight execs globally (a semaphore around the runner), and the
-per-node worker pool uses the same limit. A cancelled cycle (shutdown, reload) never swaps a snapshot:
-the last good one stays. Reload restarts the loop on the same store. See [ADR 0009](adr/0009-concurrency-and-cancellation.md).
+per-node worker pool uses the same limit. Each exec has a deadline (`collection.commandTimeout`); a
+timeout is a reader error. A cancelled cycle (shutdown, reload) never swaps a snapshot:
+the last good one stays. Reload restarts the loop on the same store (bounded wait for the old one). See [ADR 0009](adr/0009-concurrency-and-cancellation.md).
 
 ## Export rules
 

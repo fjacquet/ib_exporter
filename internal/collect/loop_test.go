@@ -515,3 +515,23 @@ func TestLoop_CancelledCycleDoesNotSwap(t *testing.T) {
 	e := one(t, st.Load().Fabrics["a"].Samples, "ib_collect_errors_total", map[string]string{"reader": "perfquery"})
 	require.InDelta(t, 0, e.Value, 0, "errors caused only by cancellation are not counted")
 }
+
+// timeoutRunner fails the HCA's perfquery like a command that hit collection.commandTimeout.
+type timeoutRunner struct{ *fakeRunner }
+
+func (r timeoutRunner) Run(ctx context.Context, f config.Fabric, tool string, args ...string) ([]byte, error) {
+	if tool == "perfquery" && slices.Contains(args, "2") {
+		return nil, fmt.Errorf("perfquery: timed out after 30s: %w", context.DeadlineExceeded)
+	}
+	return r.fakeRunner.Run(ctx, f, tool, args...)
+}
+
+func TestLoop_CommandTimeoutCountsAsError(t *testing.T) {
+	r := newFake()
+	register(t, r, "a", 1, 2)
+	st := &ib.SnapshotStore{}
+	l := NewCollectionLoop(newCfg("a"), timeoutRunner{r}, st, WithClock((&clock{time.Unix(1000, 0)}).now))
+	require.NoError(t, l.Once(context.Background()))
+	e := one(t, st.Load().Fabrics["a"].Samples, "ib_collect_errors_total", map[string]string{"reader": "perfquery"})
+	require.InDelta(t, 1, e.Value, 0, "a timeout is a reader failure, unlike a cancellation")
+}

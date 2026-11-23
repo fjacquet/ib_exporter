@@ -34,6 +34,9 @@ func (c *Config) Validate() error {
 	if c.Sources.Ibswinfo.Enabled && c.Sources.Ibswinfo.Path == "" {
 		return errors.New("sources.ibswinfo.path must not be empty when sources.ibswinfo.enabled is true")
 	}
+	if col.CommandTimeout <= 0 {
+		return fmt.Errorf("collection.commandTimeout %s must be > 0", col.CommandTimeout)
+	}
 	if len(c.Fabrics) == 0 && !c.Sources.LocalHCA {
 		return errors.New("no fabrics configured and sources.localHCA is false")
 	}

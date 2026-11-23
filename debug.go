@@ -51,7 +51,7 @@ func newRunner(cfg *config.Config, trace bool) diags.Runner {
 	if cfg.Replay.Dir != "" {
 		return replay.Runner{Dir: cfg.Replay.Dir}
 	}
-	r := &diags.ExecRunner{}
+	r := &diags.ExecRunner{Timeout: cfg.Collection.CommandTimeout}
 	if trace {
 		r.Trace = func(cmd string, out []byte, err error) {
 			slog.Info("trace", "cmd", cmd, "output", string(out), "err", err)
