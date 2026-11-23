@@ -1,0 +1,5 @@
+# PortRcvConCtrl counters: Lid 5 port 1
+PortPktRcvFECN:..................11
+PortPktRcvBECN:..................12
+# PortXmitConCtrl counters: Lid 5 port 1
+PortXmitTimeCong:................13

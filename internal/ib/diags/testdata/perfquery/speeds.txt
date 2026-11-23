@@ -1,0 +1,29 @@
+# PortExtendedSpeedsCounters counters: Lid 5 port 1
+PortSelect:......................1
+CounterSelect:...................0x0000000000000000
+SyncHeaderErrorCounter:..........0
+UnknownBlockCounter:.............0
+ErrorDetectionCounterLane0:......0
+ErrorDetectionCounterLane1:......1
+ErrorDetectionCounterLane2:......2
+ErrorDetectionCounterLane3:......3
+FECCorrectableBlockCtrLane0:.....0
+FECCorrectableBlockCtrLane1:.....10
+FECCorrectableBlockCtrLane2:.....20
+FECCorrectableBlockCtrLane3:.....30
+FECUncorrectableBlockCtrLane0:...0
+FECUncorrectableBlockCtrLane1:...0
+FECUncorrectableBlockCtrLane2:...0
+FECUncorrectableBlockCtrLane3:...0
+# PortExtendedSpeedsCounters with RS-FEC Active counters: Lid 5 port 2
+PortSelect:......................2
+CounterSelect:...................0x0000000000000000
+SyncHeaderErrorCounter:..........1
+UnknownBlockCounter:.............0
+FECCorrectableSymbolCtrLane0:....100
+FECCorrectableSymbolCtrLane1:....101
+FECCorrectableSymbolCtrLane2:....102
+FECCorrectableSymbolCtrLane3:....103
+PortFECCorrectableBlockCtr:......5000
+PortFECUncorrectableBlockCtr:....2
+PortFECCorrectedSymbolCtr:.......9000
