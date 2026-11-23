@@ -2,6 +2,7 @@ package diags
 
 import (
 	"errors"
+	"fmt"
 	"regexp"
 	"strconv"
 	"strings"
@@ -25,6 +26,15 @@ var (
 	smirKV = regexp.MustCompile(`^\s*(LID|GUID|ActCount|Priority|SMState)\.+\s*(\S+)\s*$`)
 )
 
+// normGUID returns the 0x%016x form ibnetdiscover prints (sminfo.c prints unpadded hex).
+func normGUID(g string) string {
+	n, err := strconv.ParseUint(strings.TrimPrefix(strings.ToLower(g), "0x"), 16, 64)
+	if err != nil {
+		return strings.ToLower(g)
+	}
+	return fmt.Sprintf("0x%016x", n)
+}
+
 // ParseSMInfo parses `sminfo` output or the first record of `saquery SMIR`. Any missing or
 // non-numeric field is an error.
 func ParseSMInfo(out []byte) (SMInfo, error) {
@@ -34,7 +44,7 @@ func ParseSMInfo(out []byte) (SMInfo, error) {
 		prio, _ := strconv.Atoi(string(m[4]))
 		st, _ := strconv.Atoi(string(m[5]))
 		if err == nil {
-			return SMInfo{GUID: strings.ToLower(string(m[2])), LID: lid, ActivityCount: uint32(act), Priority: prio, State: st}, nil
+			return SMInfo{GUID: normGUID(string(m[2])), LID: lid, ActivityCount: uint32(act), Priority: prio, State: st}, nil
 		}
 	}
 	kv := map[string]string{}
@@ -52,7 +62,7 @@ func ParseSMInfo(out []byte) (SMInfo, error) {
 	if kv["GUID"] == "" || errors.Join(e1, e2, e3, e4) != nil {
 		return SMInfo{}, errors.New("no SM info found: unknown format")
 	}
-	return SMInfo{GUID: strings.ToLower(kv["GUID"]), LID: lid, ActivityCount: uint32(act), Priority: prio, State: st}, nil
+	return SMInfo{GUID: normGUID(kv["GUID"]), LID: lid, ActivityCount: uint32(act), Priority: prio, State: st}, nil
 }
 
 // SMSamples converts SMInfo into gauges. Every series carries fabric,sm_guid,sm_lid.

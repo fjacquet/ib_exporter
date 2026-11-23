@@ -38,3 +38,23 @@ func TestParseSMInfo_Garbage(t *testing.T) {
 		}
 	}
 }
+
+func TestParseSMInfo_UnpaddedGUIDIsNormalised(t *testing.T) {
+	line := "sminfo: sm lid 1 sm guid 0x2C9030012ab01, activity count 1 priority 0 state 3 SMINFO_MASTER\n"
+	smir := "SMInfoRecord dump:\n\t\tLID...................1\n\t\tGUID..................0x0002c9030012ab01\n" +
+		"\t\tActCount..............1\n\t\tPriority..............0\n\t\tSMState...............3\n"
+	a, err := ParseSMInfo([]byte(line))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := ParseSMInfo([]byte(smir))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.GUID != "0x0002c9030012ab01" || a.GUID != b.GUID {
+		t.Fatalf("sminfo %q smir %q", a.GUID, b.GUID)
+	}
+	if _, ok := sampleVal(SMSamples("f", a), "ib_sm_info", "sm_guid", "0x0002c9030012ab01"); !ok {
+		t.Fatal("sm_guid label not normalised")
+	}
+}
