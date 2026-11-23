@@ -1,0 +1,9 @@
+SMInfoRecord dump:
+		RID
+		LID...................2
+		SMInfo dump:
+		GUID..................0x0002c9030012ab02
+		SM_Key................0x0000000000000001
+		ActCount..............77
+		Priority..............5
+		SMState...............2

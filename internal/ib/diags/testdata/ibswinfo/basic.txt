@@ -1,0 +1,16 @@
+=================================
+ name            : leaf-01
+ part number     : MQM8700-HS2F
+ serial number   : MT2001T01234
+ product name    : Quantum HDR 40p
+ firmware version: 27.2008.2102
+ PSID            : MT_0000000063
+ uptime          : 12d 3h 4m 5s
+ temperature     : 47 C
+ PSU1 status     : OK
+ PSU1 power      : 112 W
+ PSU2 status     : OK
+ PSU2 power      : N/A
+ FAN1            : 8200 RPM
+ FAN2            : 8050 RPM
+ FAN3            : N/A
