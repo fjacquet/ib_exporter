@@ -1,4 +1,4 @@
-# Demo: no InfiniBand hardware needed. The exporter reads recorded
+# Demo: no InfiniBand hardware needed. The exporter reads hand-written
 # infiniband-diags output from replay.dir/<fabric name>/.
 server:
   port: 9449
