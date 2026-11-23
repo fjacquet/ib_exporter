@@ -1,0 +1,21 @@
+# Go modules and the Dockerfile base images. GitHub Actions are not listed:
+# the workflows are thin callers of fjacquet/ci@v1, which owns action pinning.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+    ignore:
+      # Pre-release base images are never appropriate for a production image.
+      - dependency-name: "*"
+        versions: ["*.*.*-rc.*", "*.*.*-beta.*"]
